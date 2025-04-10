@@ -141,40 +141,6 @@ projection = pd.DataFrame(projection_rows)
 st.subheader("VL prévisionnelle")
 st.dataframe(projection)
 
-# === EXPORT EXCEL ===
-buffer = io.BytesIO()
-with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
-    projection.to_excel(writer, index=False, sheet_name='Projection')
-buffer.seek(0)
-st.download_button(
-    label="📥 Exporter la projection Excel",
-    data=buffer,
-    file_name="projection_vl.xlsx",
-    mime="application/vnd.ms-excel"
-)
-
-# === EXPORT PARAMÈTRES JSON ===
-if st.sidebar.button("📤 Exporter les paramètres JSON"):
-    export_data = {
-        "nom_fonds": nom_fonds,
-        "date_vl_connue": date_vl_connue_str,
-        "date_fin_fonds": date_fin_fonds_str,
-        "anr_derniere_vl": anr_derniere_vl,
-        "nombre_parts": nombre_parts,
-        "impacts": impacts,
-        "actifs": actifs
-    }
-    json_export = json.dumps(export_data, indent=2).encode('utf-8')
-    st.sidebar.download_button("Télécharger paramètres JSON", json_export, file_name="parametres_vl.json")
-
-# === BOUTON RÉINITIALISATION ===
-if st.sidebar.button("♻️ Réinitialiser les paramètres"):
-    st.session_state.params = default_params.copy()
-    st.rerun()
-
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
-
 # Définir Helvetica comme police globale
 plt.rcParams['font.family'] = 'Open Sans'
 
@@ -191,8 +157,8 @@ ax.plot(
     marker='o',
     markersize=7,
     color=couleur_bleue,
-    markerfacecolor='white',
-    markeredgewidth=2,
+    markerfacecolor=couleur_bleue,  # Points remplis de couleur bleue
+    markeredgewidth=1,
     markeredgecolor=couleur_bleue
 )
 
@@ -236,8 +202,259 @@ ax.set_facecolor('white')
 ax.spines['right'].set_visible(False)
 ax.spines['top'].set_visible(False)
 
-# Pas de quadrillage
-# ax.grid(True, which='major', linestyle='--', linewidth=0.5, alpha=0.7)
-
 st.pyplot(fig)
 
+# === EXPORT EXCEL AVEC GRAPHIQUE ===
+buffer = io.BytesIO()
+with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
+    # Exporter les données
+    projection.to_excel(writer, index=False, sheet_name='Projection')
+    
+    # Accéder au classeur et à la feuille
+    workbook = writer.book
+    worksheet = writer.sheets['Projection']
+    
+    # Formats pour l'Excel
+    header_format = workbook.add_format({
+        'bold': True,
+        'font_color': couleur_bleue,
+        'bg_color': '#F0F0F0',
+        'border': 0,
+        'align': 'center',
+        'valign': 'vcenter'
+    })
+    
+    # Format pour cellules texte alignées à droite (pour les valeurs monétaires)
+    text_right_format = workbook.add_format({
+        'align': 'right'
+    })
+    
+    # Fonction personnalisée pour formater les montants
+    def custom_euro_format(value):
+        """Formate un nombre en format monétaire français sans zéros superflus"""
+        if isinstance(value, str):
+            # Si c'est déjà une chaîne avec €, extraire la valeur numérique
+            if "€" in value:
+                try:
+                    value = float(value.replace(" ", "").replace("€", "").replace(",", "."))
+                except ValueError:
+                    return value  # Si impossible à convertir, retourner tel quel
+            else:
+                try:
+                    value = float(value.replace(",", "."))
+                except ValueError:
+                    return value  # Si impossible à convertir, retourner tel quel
+        
+        # Formater la valeur numérique
+        formatted = f"{value:,.2f}".replace(",", " ").replace(".", ",")
+        return f"{formatted} €"
+    
+    # Appliquer le format d'en-tête
+    for col_num, value in enumerate(projection.columns.values):
+        worksheet.write(0, col_num, value, header_format)
+    
+    # Enlever le quadrillage
+    worksheet.hide_gridlines(2)  # 2 = enlever complètement le quadrillage
+    
+    # Mettre en forme les colonnes monétaires et ajuster les largeurs
+    for idx, col in enumerate(projection.columns):
+        # Calculer la largeur optimale (plus précise)
+        col_values = projection[col].astype(str)
+        max_len = max(
+            max([len(str(s)) for s in col_values]),
+            len(col)
+        ) + 3  # Marge supplémentaire
+        
+        # Limiter la largeur maximum
+        max_len = min(max_len, 40)
+        
+        # Appliquer la largeur
+        worksheet.set_column(idx, idx, max_len)
+        
+        # Créer un format spécifique pour les nombres
+        number_format = workbook.add_format({
+            'align': 'right',
+            'num_format': '#,##0.00',  # Format standard pour les nombres avec décimales
+        })
+        
+        # Format pour les nombres négatifs en rouge
+        negative_number_format = workbook.add_format({
+            'align': 'right',
+            'num_format': '#,##0.00',  # Format standard pour les nombres avec décimales
+            'font_color': 'red',
+        })
+        
+        # Créer un format pour les cellules monétaires
+        money_format = workbook.add_format({
+            'align': 'right',
+            'num_format': '#,##0.00 €',  # Format monétaire sans zéros superflus
+        })
+        
+        # Format pour les montants négatifs en rouge
+        negative_money_format = workbook.add_format({
+            'align': 'right',
+            'num_format': '#,##0.00 €',  # Format monétaire sans zéros superflus
+            'font_color': 'red',
+        })
+        
+        # Appliquer le format monétaire si la colonne contient "€"
+        if "€" in col or any(s in col for s in ["Impact", "Actif", "VL"]):
+            # Écrire comme nombres réels avec format monétaire
+            for row_num in range(1, len(projection) + 1):
+                cell_value = projection.iloc[row_num-1, idx]
+                
+                # Extraire la valeur numérique
+                if isinstance(cell_value, str) and "€" in cell_value:
+                    numeric_value = float(cell_value.replace(" ", "").replace("€", "").replace(",", "."))
+                else:
+                    try:
+                        numeric_value = float(cell_value)
+                    except (ValueError, TypeError):
+                        numeric_value = 0
+                
+                # Appliquer le format approprié selon si le nombre est négatif ou positif
+                if numeric_value < 0:
+                    worksheet.write_number(row_num, idx, numeric_value, negative_money_format)
+                else:
+                    worksheet.write_number(row_num, idx, numeric_value, money_format)
+        else:
+            # Pour les autres colonnes (non monétaires)
+            for row_num in range(1, len(projection) + 1):
+                worksheet.write(row_num, idx, projection.iloc[row_num-1, idx])
+    
+    # --- AJOUT DU GRAPHIQUE DIRECTEMENT DANS LA FEUILLE DE PROJECTION ---
+    
+    # Préparation des données pour le graphique (sans nouvelle feuille)
+    # Nous allons ajouter ces données directement en-dessous du tableau principal
+    
+    # Déterminer où commencer à ajouter les données du graphique (après le tableau principal)
+    start_row = len(projection) + 3  # +3 pour laisser un peu d'espace
+    
+    # Ajouter un titre pour la section graphique
+    title_format = workbook.add_format({
+        'bold': True,
+        'font_size': 16,
+        'font_color': couleur_bleue,
+        'align': 'left'
+    })
+    worksheet.write(start_row, 0, f'Atterrissage VL - {nom_fonds}', title_format)
+    
+    # En-têtes pour les données du graphique
+    headers_format = workbook.add_format({
+        'bold': True,
+        'font_color': couleur_bleue,
+        'bg_color': '#F0F0F0',
+        'border': 0,
+        'align': 'center'
+    })
+    worksheet.write(start_row + 1, 0, 'Date', headers_format)
+    worksheet.write(start_row + 1, 1, 'VL', headers_format)
+    
+    # Format pour les dates
+    date_format = workbook.add_format({'num_format': 'dd/mm/yyyy'})
+    
+    # Écrire les données pour le graphique
+    for i, (date, vl) in enumerate(zip(dates_semestres, vl_semestres)):
+        row = start_row + 2 + i
+        # Écrire la date
+        worksheet.write_datetime(row, 0, date, date_format)
+        # Écrire la VL comme nombre
+        worksheet.write_number(row, 1, float(vl))
+    
+    # Créer le graphique simple avec style similaire à l'application
+    chart = workbook.add_chart({'type': 'line'})
+    
+    # Configurer la série de données pour ressembler au graphique de l'application
+    chart.add_series({
+        'categories': [worksheet.name, start_row + 2, 0, start_row + 1 + len(dates_semestres), 0],
+        'values': [worksheet.name, start_row + 2, 1, start_row + 1 + len(dates_semestres), 1],
+        'marker': {
+            'type': 'circle',
+            'size': 8,
+            'border': {'color': couleur_bleue},
+            'fill': {'color': couleur_bleue}  # Points remplis de couleur bleue
+        },
+        'line': {
+            'color': couleur_bleue,
+            'width': 2.5
+        },
+        'data_labels': {
+            'value': True,
+            'position': 'above',
+            'font': {
+                'color': 'white',
+                'bold': True,
+                'size': 9
+            },
+            'num_format': '#,##0.00 "€"',  # Format sans zéros superflus
+            'border': {'color': couleur_bleue},
+            'fill': {'color': couleur_bleue}
+        },
+    })
+    
+    # Configurer le graphique pour qu'il ressemble à celui de l'application
+    chart.set_title({
+        'name': f'Atterrissage VL - {nom_fonds}',  # Même titre que dans l'interface
+        'name_font': {
+            'size': 16,  # Même taille que dans l'interface
+            'color': couleur_bleue,
+            'bold': True
+        }
+    })
+    
+    chart.set_x_axis({
+        'name': '',  # Pas de titre d'axe
+        'num_format': 'mmm-yy',  # Format "jun-25", "dec-25"
+        'num_font': {
+            'rotation': 45,
+            'color': couleur_bleue
+        },
+        'line': {'color': couleur_bleue},
+        'major_gridlines': {'visible': False}
+    })
+    
+    chart.set_y_axis({
+        'name': 'VL (€)',
+        'name_font': {
+            'color': couleur_bleue,
+            'bold': True
+        },
+        'num_format': '#,##0.00 "€"',  # Format sans zéros superflus
+        'num_font': {'color': couleur_bleue},
+        'line': {'color': couleur_bleue},
+        'major_gridlines': {'visible': True, 'line': {'color': '#E0E0E0', 'width': 0.5}}  # Lignes de grille légères
+    })
+    
+    chart.set_legend({'none': True})
+    chart.set_chartarea({'border': {'none': True}, 'fill': {'color': 'white'}})
+    chart.set_plotarea({'border': {'none': True}, 'fill': {'color': 'white'}})
+    
+    # Insérer le graphique dans la feuille
+    worksheet.insert_chart(start_row + 2, 3, chart, {'x_scale': 1.5, 'y_scale': 1.2})
+
+buffer.seek(0)
+st.download_button(
+    label="📥 Exporter la projection avec graphique Excel",
+    data=buffer,
+    file_name="projection_vl.xlsx",
+    mime="application/vnd.ms-excel"
+)
+
+# === EXPORT PARAMÈTRES JSON ===
+if st.sidebar.button("📤 Exporter les paramètres JSON"):
+    export_data = {
+        "nom_fonds": nom_fonds,
+        "date_vl_connue": date_vl_connue_str,
+        "date_fin_fonds": date_fin_fonds_str,
+        "anr_derniere_vl": anr_derniere_vl,
+        "nombre_parts": nombre_parts,
+        "impacts": impacts,
+        "actifs": actifs
+    }
+    json_export = json.dumps(export_data, indent=2).encode('utf-8')
+    st.sidebar.download_button("Télécharger paramètres JSON", json_export, file_name="parametres_vl.json")
+
+# === BOUTON RÉINITIALISATION ===
+if st.sidebar.button("♻️ Réinitialiser les paramètres"):
+    st.session_state.params = default_params.copy()
+    st.rerun()
