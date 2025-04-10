@@ -6,6 +6,8 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import io
 
+
+
 # Importations pour l'export PDF
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
