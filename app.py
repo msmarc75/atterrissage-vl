@@ -196,6 +196,7 @@ for i in range(nb_actifs):
         variation = variation_brute * 0.75  # Réduction de 25% pour l'IS
     else:
         variation = variation_brute  # Pas de modification en cas de moins-value ou si IS non provisionné
+    
     actifs.append({
         "nom": nom_actif,
         "pct_detention": pct_detention / 100,
@@ -426,8 +427,21 @@ with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                 cell_value = projection.iloc[row_num, idx]
                 
                 # Extraire la valeur numérique
-                if isinstance(cell_value, str) and "€" in cell_value:
-                    numeric_value = float(cell_value.replace(" ", "").replace("€", "").replace(",", "."))
+                if isinstance(cell_value, str):
+                    if "€" in cell_value:
+                        # Format standard avec euro
+                        numeric_value = float(cell_value.replace(" ", "").replace("€", "").replace(",", "."))
+                    elif "brut:" in cell_value and "|" in cell_value and "net:" in cell_value:
+                        # Format spécial pour IS: "brut: X XXX,XX € | net: X XXX,XX €"
+                        # Extraire seulement la valeur nette
+                        net_part = cell_value.split("|")[1].strip()
+                        net_value = net_part.replace("net:", "").strip()
+                        numeric_value = float(net_value.replace(" ", "").replace("€", "").replace(",", "."))
+                    else:
+                        try:
+                            numeric_value = float(cell_value.replace(",", "."))
+                        except ValueError:
+                            numeric_value = 0
                 else:
                     try:
                         numeric_value = float(cell_value)
@@ -445,8 +459,21 @@ with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                 cell_value = projection.iloc[row_num, idx]
                 
                 # Extraire la valeur numérique
-                if isinstance(cell_value, str) and "€" in cell_value:
-                    numeric_value = float(cell_value.replace(" ", "").replace("€", "").replace(",", "."))
+                if isinstance(cell_value, str):
+                    if "€" in cell_value:
+                        # Format standard avec euro
+                        numeric_value = float(cell_value.replace(" ", "").replace("€", "").replace(",", "."))
+                    elif "brut:" in cell_value and "|" in cell_value and "net:" in cell_value:
+                        # Format spécial pour IS: "brut: X XXX,XX € | net: X XXX,XX €"
+                        # Extraire seulement la valeur nette
+                        net_part = cell_value.split("|")[1].strip()
+                        net_value = net_part.replace("net:", "").strip()
+                        numeric_value = float(net_value.replace(" ", "").replace("€", "").replace(",", "."))
+                    else:
+                        try:
+                            numeric_value = float(cell_value.replace(",", "."))
+                        except ValueError:
+                            numeric_value = 0
                 else:
                     try:
                         numeric_value = float(cell_value)
