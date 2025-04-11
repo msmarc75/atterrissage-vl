@@ -63,13 +63,7 @@ with st.sidebar.form("param_form"):
 
 # Exécution seulement si le formulaire est validé
 if submitted:
-nom_fonds = st.sidebar.text_input("Nom du fonds", params['nom_fonds'])
-date_vl_connue_str = st.sidebar.text_input("Date dernière VL connue (jj/mm/aaaa)", params['date_vl_connue'])
-date_fin_fonds_str = st.sidebar.text_input("Date fin de fonds (jj/mm/aaaa)", params['date_fin_fonds'])
-
-anr_derniere_vl = float(str(st.sidebar.text_input("ANR dernière VL connue (€)", f"{params['anr_derniere_vl']:,.2f}"))
-    .replace(" ", "").replace(",", ".").replace("€", "") or 0)
-nombre_parts = float(str(st.sidebar.text_input("Nombre de parts", f"{params['nombre_parts']:,.2f}"))
+    # === DATES SEMESTRES ===
     .replace(" ", "").replace(",", ".") or 0)
 
 # === DATES SEMESTRES ===
@@ -86,7 +80,6 @@ while datetime(y, 12, 31) <= date_fin_fonds:
 
 # === SIDEBAR : IMPACTS RÉCURRENTS ===
 with st.sidebar.expander("🔁 Impacts récurrents (même chaque semestre)", expanded=expand_all):
-st.sidebar.header("Impacts récurrents")
 impacts_recurrents = []
 nb_impacts_rec = st.sidebar.number_input("Nombre d'impacts récurrents", min_value=0, value=len(params['impacts_recurrents']), step=1)
 for i in range(nb_impacts_rec):
@@ -185,8 +178,7 @@ if submitted:
 
 # === EXPORT PDF ET EXCEL ===
 if submitted:
-
-col1, col2 = st.columns(2)
+    col1, col2 = st.columns(2)
 
 # Export Excel avec mise en forme conditionnelle
 with col1:
