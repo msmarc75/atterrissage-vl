@@ -6,17 +6,10 @@ from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import io
-import os
 
 # === INITIALISATION DE LA BASE DE DONNÉES ===
 def init_db():
     try:
-        # Vérifier si le fichier de base de données existe et s'il a une taille nulle
-        db_file = 'simulations_fonds.db'
-        if os.path.exists(db_file) and os.path.getsize(db_file) == 0:
-            print("DEBUG: Fichier de BDD corrompu ou vide, suppression")
-            os.remove(db_file)
-            
         conn = sqlite3.connect('simulations_fonds.db')
         c = conn.cursor()
         
@@ -46,6 +39,17 @@ def init_db():
             ADD COLUMN nom_scenario TEXT DEFAULT 'Base case'
             ''')
             print("Colonne nom_scenario ajoutée à la table simulations")
+        
+        # Table pour les impacts récurrents
+        c.execute('''
+        CREATE TABLE IF NOT EXISTS impacts_recurrents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            simulation_id INTEGER NOT NULL,
+            libelle TEXT NOT NULL,
+            montant REAL NOT NULL,
+            FOREIGN KEY (simulation_id) REFERENCES simulations (id) ON DELETE CASCADE
+        )
+        ''')
         
         # Table pour les impacts récurrents
         c.execute('''
@@ -112,8 +116,6 @@ def init_db():
 def sauvegarder_simulation(params, commentaire=""):
     try:
         conn = sqlite3.connect('simulations_fonds.db')
-        # Activer les clés étrangères pour cette connexion
-        conn.execute("PRAGMA foreign_keys = ON")
         c = conn.cursor()
         
         # S'assurer que les valeurs numériques sont bien des nombres
@@ -173,7 +175,6 @@ def sauvegarder_simulation(params, commentaire=""):
         
         
         simulation_id = c.lastrowid
-        print(f"DEBUG: Simulation créée avec ID={simulation_id}")
         
         # Insérer les impacts récurrents
         for libelle, montant in params['impacts']:
@@ -236,12 +237,9 @@ def sauvegarder_simulation(params, commentaire=""):
                 bool(actif.get('is_a_provisionner', False))
             ))
         
-        print("DEBUG: Tentative de commit...")
         conn.commit()
-        print("DEBUG: Commit effectué")
         conn.close()
         
-        print(f"DEBUG: Sauvegarde complète de la simulation #{simulation_id}")
         return simulation_id
         
     except Exception as e:
@@ -347,16 +345,6 @@ def lister_simulations():
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     
-    # Débug - lister toutes les simulations brutes
-    c.execute("SELECT * FROM simulations")
-    all_rows = c.fetchall()
-    print(f"DEBUG - Nombre total de simulations en base: {len(all_rows)}")
-    for row in all_rows:
-        try:
-            print(f"  - ID: {row['id']}, Nom: {row['nom_fonds']}, Scénario: {row.get('nom_scenario', 'N/A')}")
-        except Exception as e:
-            print(f"  - Erreur lecture row: {e}")
-    
     # Vérifier si la colonne nom_scenario existe déjà dans la table
     c.execute("PRAGMA table_info(simulations)")
     colonnes = c.fetchall()
@@ -398,7 +386,6 @@ def lister_simulations():
     conn.close()
     
     # Déboguer - afficher les infos importantes pour chaque simulation
-    print(f"DEBUG - Nombre de simulations traitées: {len(simulations)}")
     for i, sim in enumerate(simulations):
         print(f"Simulation #{i+1}:")
         print(f"  ID: {sim['id']}")
@@ -411,8 +398,6 @@ def lister_simulations():
 
 def supprimer_simulation(simulation_id):
     conn = sqlite3.connect('simulations_fonds.db')
-    # Activer les clés étrangères pour cette connexion
-    conn.execute("PRAGMA foreign_keys = ON")
     c = conn.cursor()
     
     # Supprimer les occurrences d'impacts multidates
@@ -456,7 +441,7 @@ def champ_numerique(label, valeur):
 
 # === PARAMÈTRES INITIAUX ===
 default_params = {
-    "nom_fonds": "FPCI IE 1",
+    "nom_fonds": "Nom du Fonds",
     "nom_scenario": "Base case",
     "date_vl_connue": "31/12/2024",
     "date_fin_fonds": "31/12/2028",
@@ -495,7 +480,7 @@ st.sidebar.header("Gestion des simulations en BDD")
 # Option pour sauvegarder la simulation actuelle
 with st.sidebar.expander("💾 Sauvegarder la simulation"):
     # Récupérer les valeurs actuelles de manière sécurisée
-    current_nom_fonds = params.get('nom_fonds', "FPCI IE 1")
+    current_nom_fonds = params.get('nom_fonds', "Nom du Fonds")
     current_nom_scenario = params.get('nom_scenario', "Base case")
     
     # Vérifier si les variables locales existent et les utiliser si c'est le cas
@@ -550,12 +535,6 @@ with st.sidebar.expander("💾 Sauvegarder la simulation"):
             
             if simulation_id:
                 st.sidebar.success(f"Nouvelle simulation '{current_nom_scenario}' sauvegardée avec succès")
-                # Forcer un changement dans l'état de session pour déclencher un rechargement
-                if 'refresh_counter' not in st.session_state:
-                    st.session_state.refresh_counter = 0
-                st.session_state.refresh_counter += 1
-                print(f"DEBUG: Rechargement forcé, compteur={st.session_state.refresh_counter}")
-                st.rerun()
             else:
                 st.sidebar.error("Échec de la sauvegarde, veuillez réessayer")
     else:
@@ -628,11 +607,6 @@ with st.sidebar.expander("💾 Sauvegarder la simulation"):
                 
                 if new_id:
                     st.sidebar.success(f"Simulation '{current_nom_scenario}' mise à jour avec succès")
-                    # Forcer un changement dans l'état de session pour déclencher un rechargement
-                    if 'refresh_counter' not in st.session_state:
-                        st.session_state.refresh_counter = 0
-                    st.session_state.refresh_counter += 1
-                    st.rerun()
                 else:
                     st.sidebar.error("Échec de la mise à jour, veuillez réessayer")
         else:
@@ -650,44 +624,23 @@ with st.sidebar.expander("📂 Charger une simulation"):
         )
         
         col1, col2 = st.columns(2)
-
-    with col1:
-    if st.button("Charger cette simulation"):
-        simulation_id = options[sim_selectionnee]  # Cette ligne et les suivantes doivent être indentées
-        params_charges = charger_simulation(simulation_id)
-        st.session_state.params = params_charges
-        st.rerun()
-        
+        with col1:
+            if st.button("Charger cette simulation"):
+                simulation_id = options[sim_selectionnee]
+                params_charges = charger_simulation(simulation_id)
+                st.session_state.params = params_charges
+                st.rerun()
         with col2:
             if st.button("🗑️ Supprimer"):
-            simulation_id = options[sim_selectionnee]
-            supprimer_simulation(simulation_id)
-            st.success("Simulation supprimée avec succès")
-            st.rerun()
+                simulation_id = options[sim_selectionnee]
+                supprimer_simulation(simulation_id)
+                st.success("Simulation supprimée avec succès")
+                st.rerun()
     else:
         st.info("Aucune simulation sauvegardée")
 
 # === SAISIE UTILISATEUR ===
-# Liste des fonds disponibles
-fonds_disponibles = [
-    "FPCI IE 1",
-    "FPCI IE 2",
-    "NIC 2",
-    "FPCI Recovery",
-    "NFS 1",
-    "NIA",
-    "NIO",
-    "NIO 2",
-    "NIO 3"
-]
-
-# Utiliser le selectbox pour le nom du fonds au lieu d'un text_input
-nom_fonds = st.sidebar.selectbox(
-    "Nom du fonds",
-    options=fonds_disponibles,
-    index=fonds_disponibles.index(params['nom_fonds']) if params['nom_fonds'] in fonds_disponibles else 0
-)
-
+nom_fonds = st.sidebar.text_input("Nom du fonds", params['nom_fonds'])
 nom_scenario = st.sidebar.text_input("Nom du scénario", params.get('nom_scenario', 'Base case'))
 date_vl_connue_str = st.sidebar.text_input("Date dernière VL connue (jj/mm/aaaa)", params['date_vl_connue'])
 date_fin_fonds_str = st.sidebar.text_input("Date fin de fonds (jj/mm/aaaa)", params['date_fin_fonds'])
@@ -1036,7 +989,7 @@ with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
         'num_format': '#,##0.00 €',  # Format monétaire sans zéros superflus
         'font_color': 'red',
     })
-
+    
     # Mettre en forme les colonnes monétaires et ajuster les largeurs (avec décalage)
     for idx, col in enumerate(projection.columns):
         # Calculer la largeur optimale (plus précise)
@@ -1253,8 +1206,7 @@ with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
     })
     
     chart.set_y_axis({
-        'name':
-        'VL (€)',
+        'name': 'VL (€)',
         'name_font': {
             'color': couleur_bleue,
             'bold': True
@@ -1302,7 +1254,6 @@ if st.sidebar.button("📤 Exporter les paramètres JSON"):
     nom_fichier_json = f"{date_aujourd_hui} - {nom_fonds} - {nom_scenario}.json"
     json_export = json.dumps(export_data, indent=2).encode('utf-8')
     st.sidebar.download_button("Télécharger paramètres JSON", json_export, file_name=nom_fichier_json)
-
 
 # === BOUTON RÉINITIALISATION ===
 if st.sidebar.button("♻️ Réinitialiser les paramètres"):
