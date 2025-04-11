@@ -441,7 +441,7 @@ def champ_numerique(label, valeur):
 
 # === PARAMÈTRES INITIAUX ===
 default_params = {
-    "nom_fonds": "Nom du Fonds",
+    "nom_fonds": "FPCI IE 1",
     "nom_scenario": "Base case",
     "date_vl_connue": "31/12/2024",
     "date_fin_fonds": "31/12/2028",
@@ -480,7 +480,7 @@ st.sidebar.header("Gestion des simulations en BDD")
 # Option pour sauvegarder la simulation actuelle
 with st.sidebar.expander("💾 Sauvegarder la simulation"):
     # Récupérer les valeurs actuelles de manière sécurisée
-    current_nom_fonds = params.get('nom_fonds', "Nom du Fonds")
+    current_nom_fonds = params.get('nom_fonds', "FPCI IE 1")
     current_nom_scenario = params.get('nom_scenario', "Base case")
     
     # Vérifier si les variables locales existent et les utiliser si c'est le cas
@@ -640,7 +640,26 @@ with st.sidebar.expander("📂 Charger une simulation"):
         st.info("Aucune simulation sauvegardée")
 
 # === SAISIE UTILISATEUR ===
-nom_fonds = st.sidebar.text_input("Nom du fonds", params['nom_fonds'])
+# Liste des fonds disponibles
+fonds_disponibles = [
+    "FPCI IE 1",
+    "FPCI IE 2",
+    "NIC 2",
+    "FPCI Recovery",
+    "NFS 1",
+    "NIA",
+    "NIO",
+    "NIO 2",
+    "NIO 3"
+]
+
+# Utiliser le selectbox pour le nom du fonds au lieu d'un text_input
+nom_fonds = st.sidebar.selectbox(
+    "Nom du fonds",
+    options=fonds_disponibles,
+    index=fonds_disponibles.index(params['nom_fonds']) if params['nom_fonds'] in fonds_disponibles else 0
+)
+
 nom_scenario = st.sidebar.text_input("Nom du scénario", params.get('nom_scenario', 'Base case'))
 date_vl_connue_str = st.sidebar.text_input("Date dernière VL connue (jj/mm/aaaa)", params['date_vl_connue'])
 date_fin_fonds_str = st.sidebar.text_input("Date fin de fonds (jj/mm/aaaa)", params['date_fin_fonds'])
