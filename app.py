@@ -172,7 +172,12 @@ for i in range(nb_actifs):
         val_proj = 1_050_000.0
 
     nom_actif = st.sidebar.text_input(f"Nom Actif {i+1}", nom_defaut)
-    pct_detention = st.sidebar.slider(f"% Détention Actif {i+1}", min_value=0.0, max_value=100.0, value=pct_defaut, step=1.0)
+    # Remplace le slider par un champ de saisie directe du pourcentage
+    pct_text = st.sidebar.text_input(f"% Détention Actif {i+1}", value=f"{pct_defaut:.2f}")
+    try:
+        pct_detention = float(pct_text.replace(",", "."))
+    except ValueError:
+        pct_detention = pct_defaut  # En cas d'erreur, utiliser la valeur par défaut
     valeur_actuelle = champ_numerique(f"Valeur actuelle Actif {i+1} (€)", val_actuelle)
     valeur_projetee = champ_numerique(f"Valeur projetée en S+1 Actif {i+1} (€)", val_proj)
     variation = (valeur_projetee - valeur_actuelle) * (pct_detention / 100)
