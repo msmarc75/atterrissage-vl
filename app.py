@@ -29,8 +29,7 @@ default_params = {
         ("Frais corporate", -50_000.0),
         ("Honoraires NIV", -30_000.0)
     ],
-    "actifs": [],
-    "impacts_specifiques": {}  # Nouveau dictionnaire pour impacts spécifiques
+    "actifs": []
 }
 
 # === CHARGEMENT / PERSISTENCE DES PARAMÈTRES ===
@@ -55,7 +54,7 @@ nombre_parts = champ_numerique("Nombre de parts", params['nombre_parts'])
 # Impacts personnalisés
 st.sidebar.header("Impacts semestriels personnalisés")
 impacts = []
-nb_impacts = st.sidebar.number_input("Nombre d'impacts récurrents", min_value=0, value=len(params['impacts']), step=1)
+nb_impacts = st.sidebar.number_input("Nombre d'impacts", min_value=0, value=len(params['impacts']), step=1)
 for i in range(nb_impacts):
     if i < len(params['impacts']):
         libelle_defaut, montant_defaut = params['impacts'][i]
@@ -64,63 +63,6 @@ for i in range(nb_impacts):
     libelle = st.sidebar.text_input(f"Libellé impact {i+1}", libelle_defaut)
     montant = champ_numerique(f"Montant semestriel impact {i+1} (€)", montant_defaut)
     impacts.append((libelle, montant))
-
-# Initialiser le dictionnaire des impacts spécifiques
-if 'impacts_specifiques' not in params:
-    params['impacts_specifiques'] = {}
-impacts_specifiques = params.get('impacts_specifiques', {})
-
-# Ajouter un expander pour les impacts spécifiques par semestre
-with st.sidebar.expander("Impacts spécifiques par semestre"):
-    st.write("Ajoutez ici des impacts ponctuels pour des semestres spécifiques")
-    
-    # Sélection du semestre
-    semestres_formatted = [date.strftime('%d/%m/%Y') for date in dates_semestres[1:]]  # Exclure la première date
-    if semestres_formatted:  # Si la liste n'est pas vide
-        semestre_selectionne = st.selectbox("Sélectionner un semestre", semestres_formatted)
-        
-        # Champ pour le libellé et le montant
-        libelle_specifique = st.text_input("Libellé de l'impact spécifique", "Impact ponctuel")
-        
-        # Récupérer la valeur précédente si elle existe
-        valeur_precedente = 0.0
-        for impact_key, impact_value in impacts_specifiques.get(semestre_selectionne, {}).items():
-            if impact_key == libelle_specifique:
-                valeur_precedente = impact_value
-                break
-        
-        montant_specifique = st.number_input(
-            "Montant de l'impact spécifique (€)", 
-            value=float(valeur_precedente),
-            step=1000.0, 
-            format="%.2f"
-        )
-        
-        # Bouton pour ajouter l'impact
-        if st.button("Ajouter/Modifier cet impact spécifique"):
-            if semestre_selectionne not in impacts_specifiques:
-                impacts_specifiques[semestre_selectionne] = {}
-            impacts_specifiques[semestre_selectionne][libelle_specifique] = montant_specifique
-            st.success(f"Impact '{libelle_specifique}' de {montant_specifique} € ajouté pour le semestre {semestre_selectionne}")
-    
-    # Afficher les impacts spécifiques actuels
-    if impacts_specifiques:
-        st.write("Impacts spécifiques actuels :")
-        for semestre, impacts_dict in impacts_specifiques.items():
-            for libelle, montant in impacts_dict.items():
-                st.write(f"- {semestre} : {libelle} ({montant} €)")
-                
-                # Ajouter un bouton de suppression
-                if st.button(f"Supprimer '{libelle}' du {semestre}", key=f"del_{semestre}_{libelle}"):
-                    if semestre in impacts_specifiques and libelle in impacts_specifiques[semestre]:
-                        del impacts_specifiques[semestre][libelle]
-                        # Si le dictionnaire est vide pour ce semestre, le supprimer également
-                        if not impacts_specifiques[semestre]:
-                            del impacts_specifiques[semestre]
-                        st.success(f"Impact '{libelle}' supprimé pour le semestre {semestre}")
-                        st.rerun()
-    else:
-        st.info("Aucun impact spécifique défini")
 
 # Actifs
 st.sidebar.header("Ajouter des Actifs")
@@ -172,8 +114,7 @@ anr_courant = anr_derniere_vl
 projection_rows = []
 
 for i, date in enumerate(dates_semestres):
-    date_str = date.strftime('%d/%m/%Y')
-    row = {"Date": date_str}
+    row = {"Date": date.strftime('%d/%m/%Y')}
 
     # Variation par actif (S+1 uniquement)
     total_var_actifs = 0
@@ -187,18 +128,9 @@ for i, date in enumerate(dates_semestres):
     for libelle, montant in impacts:
         row[f"Impact - {libelle}"] = format_fr_euro(montant)
         total_impacts += montant
-    
-    # Impacts spécifiques pour ce semestre
-    total_impacts_specifiques = 0
-    if i > 0:  # On ne considère pas les impacts spécifiques pour le semestre initial
-        date_str = date.strftime('%d/%m/%Y')
-        if date_str in impacts_specifiques:
-            for libelle, montant in impacts_specifiques[date_str].items():
-                row[f"Impact spécifique - {libelle}"] = format_fr_euro(montant)
-                total_impacts_specifiques += montant
 
     if i > 0:
-        anr_courant += total_var_actifs + total_impacts + total_impacts_specifiques
+        anr_courant += total_var_actifs + total_impacts
 
     vl = anr_courant / nombre_parts
     # Arrondir à deux décimales
@@ -536,14 +468,12 @@ if st.sidebar.button("📤 Exporter les paramètres JSON"):
         "anr_derniere_vl": anr_derniere_vl,
         "nombre_parts": nombre_parts,
         "impacts": impacts,
-        "actifs": actifs,
-        "impacts_specifiques": impacts_specifiques
+        "actifs": actifs
     }
     date_aujourd_hui = datetime.now().strftime("%Y%m%d")
     nom_fichier_json = f"{date_aujourd_hui} - Atterrissage VL - {nom_fonds}.json"
     json_export = json.dumps(export_data, indent=2).encode('utf-8')
     st.sidebar.download_button("Télécharger paramètres JSON", json_export, file_name=nom_fichier_json)
-
 
 # === BOUTON RÉINITIALISATION ===
 if st.sidebar.button("♻️ Réinitialiser les paramètres"):
