@@ -9,138 +9,190 @@ import io
 
 # === INITIALISATION DE LA BASE DE DONNÉES ===
 def init_db():
-    conn = sqlite3.connect('simulations_fonds.db')
-    c = conn.cursor()
-    
-    # Table principale pour les paramètres généraux
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS simulations (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nom_fonds TEXT,
-        date_vl_connue TEXT,
-        date_fin_fonds TEXT,
-        anr_derniere_vl REAL,
-        nombre_parts REAL,
-        date_creation TIMESTAMP,
-        commentaire TEXT
-    )
-    ''')
-    
-    # Table pour les impacts récurrents
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS impacts_recurrents (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        simulation_id INTEGER,
-        libelle TEXT,
-        montant REAL,
-        FOREIGN KEY (simulation_id) REFERENCES simulations (id)
-    )
-    ''')
-    
-    # Table pour les impacts multidates
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS impacts_multidates (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        simulation_id INTEGER,
-        libelle TEXT,
-        FOREIGN KEY (simulation_id) REFERENCES simulations (id)
-    )
-    ''')
-    
-    # Table pour les occurrences des impacts multidates
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS occurrences_impacts (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        impact_multidate_id INTEGER,
-        date TEXT,
-        montant REAL,
-        FOREIGN KEY (impact_multidate_id) REFERENCES impacts_multidates (id)
-    )
-    ''')
-    
-    # Table pour les actifs
-    c.execute('''
-    CREATE TABLE IF NOT EXISTS actifs (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        simulation_id INTEGER,
-        nom TEXT,
-        pct_detention REAL,
-        valeur_actuelle REAL,
-        valeur_projetee REAL,
-        is_a_provisionner BOOLEAN,
-        FOREIGN KEY (simulation_id) REFERENCES simulations (id)
-    )
-    ''')
-    
-    conn.commit()
-    conn.close()
+    try:
+        conn = sqlite3.connect('simulations_fonds.db')
+        c = conn.cursor()
+        
+        # Table principale pour les paramètres généraux
+        c.execute('''
+        CREATE TABLE IF NOT EXISTS simulations (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            nom_fonds TEXT NOT NULL,
+            date_vl_connue TEXT NOT NULL,
+            date_fin_fonds TEXT NOT NULL,
+            anr_derniere_vl REAL NOT NULL,
+            nombre_parts REAL NOT NULL,
+            date_creation TIMESTAMP NOT NULL,
+            commentaire TEXT
+        )
+        ''')
+        
+        # Table pour les impacts récurrents
+        c.execute('''
+        CREATE TABLE IF NOT EXISTS impacts_recurrents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            simulation_id INTEGER NOT NULL,
+            libelle TEXT NOT NULL,
+            montant REAL NOT NULL,
+            FOREIGN KEY (simulation_id) REFERENCES simulations (id) ON DELETE CASCADE
+        )
+        ''')
+        
+        # Table pour les impacts multidates
+        c.execute('''
+        CREATE TABLE IF NOT EXISTS impacts_multidates (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            simulation_id INTEGER NOT NULL,
+            libelle TEXT NOT NULL,
+            FOREIGN KEY (simulation_id) REFERENCES simulations (id) ON DELETE CASCADE
+        )
+        ''')
+        
+        # Table pour les occurrences des impacts multidates
+        c.execute('''
+        CREATE TABLE IF NOT EXISTS occurrences_impacts (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            impact_multidate_id INTEGER NOT NULL,
+            date TEXT NOT NULL,
+            montant REAL NOT NULL,
+            FOREIGN KEY (impact_multidate_id) REFERENCES impacts_multidates (id) ON DELETE CASCADE
+        )
+        ''')
+        
+        # Table pour les actifs
+        c.execute('''
+        CREATE TABLE IF NOT EXISTS actifs (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            simulation_id INTEGER NOT NULL,
+            nom TEXT NOT NULL,
+            pct_detention REAL NOT NULL,
+            valeur_actuelle REAL NOT NULL,
+            valeur_projetee REAL NOT NULL,
+            is_a_provisionner BOOLEAN DEFAULT 0,
+            FOREIGN KEY (simulation_id) REFERENCES simulations (id) ON DELETE CASCADE
+        )
+        ''')
+        
+        # Activer le support des clés étrangères
+        c.execute("PRAGMA foreign_keys = ON")
+        
+        conn.commit()
+        conn.close()
+        
+        # Log de réussite
+        print("Initialisation de la BDD réussie")
+        
+    except Exception as e:
+        # En cas d'erreur, informer clairement l'utilisateur
+        st.error(f"Erreur lors de l'initialisation de la base de données: {str(e)}")
+        import traceback
+        st.error(traceback.format_exc())
 
 # Fonctions pour la gestion des simulations en base de données
 def sauvegarder_simulation(params, commentaire=""):
-    conn = sqlite3.connect('simulations_fonds.db')
-    c = conn.cursor()
-    
-    # Insérer les paramètres généraux
-    c.execute('''
-    INSERT INTO simulations (
-        nom_fonds, date_vl_connue, date_fin_fonds, 
-        anr_derniere_vl, nombre_parts, date_creation, commentaire
-    ) VALUES (?, ?, ?, ?, ?, ?, ?)
-    ''', (
-        params['nom_fonds'], 
-        params['date_vl_connue'], 
-        params['date_fin_fonds'],
-        params['anr_derniere_vl'], 
-        params['nombre_parts'], 
-        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-        commentaire
-    ))
-    
-    simulation_id = c.lastrowid
-    
-    # Insérer les impacts récurrents
-    for libelle, montant in params['impacts']:
-        c.execute('''
-        INSERT INTO impacts_recurrents (simulation_id, libelle, montant)
-        VALUES (?, ?, ?)
-        ''', (simulation_id, libelle, montant))
-    
-    # Insérer les impacts multidates
-    for impact in params['impacts_multidates']:
-        c.execute('''
-        INSERT INTO impacts_multidates (simulation_id, libelle)
-        VALUES (?, ?)
-        ''', (simulation_id, impact['libelle']))
+    try:
+        conn = sqlite3.connect('simulations_fonds.db')
+        c = conn.cursor()
         
-        impact_id = c.lastrowid
+        # S'assurer que les valeurs numériques sont bien des nombres
+        try:
+            anr = float(params['anr_derniere_vl'])
+            parts = float(params['nombre_parts'])
+        except ValueError:
+            # Si conversion impossible, utiliser des valeurs par défaut
+            st.warning("Problème avec les valeurs numériques, utilisation de valeurs par défaut")
+            anr = 10000000.0
+            parts = 10000.0
         
-        # Insérer les occurrences de cet impact
-        for occurrence in impact['montants']:
-            c.execute('''
-            INSERT INTO occurrences_impacts (impact_multidate_id, date, montant)
-            VALUES (?, ?, ?)
-            ''', (impact_id, occurrence['date'], occurrence['montant']))
-    
-    # Insérer les actifs
-    for actif in params['actifs']:
+        # Insérer les paramètres généraux
         c.execute('''
-        INSERT INTO actifs (
-            simulation_id, nom, pct_detention, 
-            valeur_actuelle, valeur_projetee, is_a_provisionner
-        ) VALUES (?, ?, ?, ?, ?, ?)
+        INSERT INTO simulations (
+            nom_fonds, date_vl_connue, date_fin_fonds, 
+            anr_derniere_vl, nombre_parts, date_creation, commentaire
+        ) VALUES (?, ?, ?, ?, ?, ?, ?)
         ''', (
-            simulation_id, 
-            actif['nom'], 
-            actif['pct_detention'],
-            actif['valeur_actuelle'], 
-            actif['valeur_projetee'], 
-            actif.get('is_a_provisionner', False)
+            params['nom_fonds'], 
+            params['date_vl_connue'], 
+            params['date_fin_fonds'],
+            anr, 
+            parts, 
+            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            commentaire
         ))
-    
-    conn.commit()
-    conn.close()
-    
-    return simulation_id
+        
+        simulation_id = c.lastrowid
+        
+        # Insérer les impacts récurrents
+        for libelle, montant in params['impacts']:
+            try:
+                montant_float = float(montant)
+            except (ValueError, TypeError):
+                st.warning(f"Problème avec la valeur de l'impact '{libelle}', utilisation de 0.0")
+                montant_float = 0.0
+                
+            c.execute('''
+            INSERT INTO impacts_recurrents (simulation_id, libelle, montant)
+            VALUES (?, ?, ?)
+            ''', (simulation_id, libelle, montant_float))
+        
+        # Insérer les impacts multidates
+        for impact in params['impacts_multidates']:
+            c.execute('''
+            INSERT INTO impacts_multidates (simulation_id, libelle)
+            VALUES (?, ?)
+            ''', (simulation_id, impact['libelle']))
+            
+            impact_id = c.lastrowid
+            
+            # Insérer les occurrences de cet impact
+            for occurrence in impact['montants']:
+                try:
+                    montant_float = float(occurrence['montant'])
+                except (ValueError, TypeError):
+                    st.warning(f"Problème avec la valeur d'occurrence pour '{impact['libelle']}', utilisation de 0.0")
+                    montant_float = 0.0
+                    
+                c.execute('''
+                INSERT INTO occurrences_impacts (impact_multidate_id, date, montant)
+                VALUES (?, ?, ?)
+                ''', (impact_id, occurrence['date'], montant_float))
+        
+        # Insérer les actifs
+        for actif in params['actifs']:
+            try:
+                pct = float(actif['pct_detention'])
+                val_act = float(actif['valeur_actuelle'])
+                val_proj = float(actif['valeur_projetee'])
+            except (ValueError, TypeError, KeyError):
+                st.warning(f"Problème avec les valeurs de l'actif '{actif.get('nom', 'sans nom')}', utilisation de valeurs par défaut")
+                pct = 1.0
+                val_act = 1000000.0
+                val_proj = 1050000.0
+                
+            c.execute('''
+            INSERT INTO actifs (
+                simulation_id, nom, pct_detention, 
+                valeur_actuelle, valeur_projetee, is_a_provisionner
+            ) VALUES (?, ?, ?, ?, ?, ?)
+            ''', (
+                simulation_id, 
+                actif.get('nom', 'Actif sans nom'), 
+                pct,
+                val_act, 
+                val_proj, 
+                bool(actif.get('is_a_provisionner', False))
+            ))
+        
+        conn.commit()
+        conn.close()
+        
+        return simulation_id
+        
+    except Exception as e:
+        st.error(f"Erreur lors de la sauvegarde: {str(e)}")
+        import traceback
+        st.error(traceback.format_exc())
+        return None
 
 def charger_simulation(simulation_id):
     conn = sqlite3.connect('simulations_fonds.db')
@@ -149,15 +201,24 @@ def charger_simulation(simulation_id):
     
     # Récupérer les paramètres généraux
     c.execute("SELECT * FROM simulations WHERE id = ?", (simulation_id,))
-    sim = dict(c.fetchone())
+    sim_row = c.fetchone()
+    
+    # Vérifier que la simulation existe
+    if not sim_row:
+        st.error(f"Simulation avec ID {simulation_id} introuvable.")
+        conn.close()
+        return None
+    
+    # Convertir en dictionnaire
+    sim = dict(sim_row)
     
     # Structure pour stocker les paramètres complets
     params = {
         'nom_fonds': sim['nom_fonds'],
         'date_vl_connue': sim['date_vl_connue'],
         'date_fin_fonds': sim['date_fin_fonds'],
-        'anr_derniere_vl': sim['anr_derniere_vl'],
-        'nombre_parts': sim['nombre_parts'],
+        'anr_derniere_vl': float(sim['anr_derniere_vl']),  # Assurer que c'est un float
+        'nombre_parts': float(sim['nombre_parts']),        # Assurer que c'est un float
         'impacts': [],
         'impacts_multidates': [],
         'actifs': []
@@ -165,7 +226,8 @@ def charger_simulation(simulation_id):
     
     # Récupérer les impacts récurrents
     c.execute("SELECT libelle, montant FROM impacts_recurrents WHERE simulation_id = ?", (simulation_id,))
-    params['impacts'] = [(row['libelle'], row['montant']) for row in c.fetchall()]
+    impacts_rows = c.fetchall()
+    params['impacts'] = [(row['libelle'], float(row['montant'])) for row in impacts_rows]
     
     # Récupérer les impacts multidates
     c.execute("SELECT id, libelle FROM impacts_multidates WHERE simulation_id = ?", (simulation_id,))
@@ -181,7 +243,7 @@ def charger_simulation(simulation_id):
         """, (impact['id'],))
         
         impact_dict['montants'] = [
-            {'date': row['date'], 'montant': row['montant']} 
+            {'date': row['date'], 'montant': float(row['montant'])} 
             for row in c.fetchall()
         ]
         
@@ -194,15 +256,33 @@ def charger_simulation(simulation_id):
     """, (simulation_id,))
     
     for row in c.fetchall():
-        params['actifs'].append({
+        actif = {
             'nom': row['nom'],
-            'pct_detention': row['pct_detention'],
-            'valeur_actuelle': row['valeur_actuelle'],
-            'valeur_projetee': row['valeur_projetee'],
+            'pct_detention': float(row['pct_detention']),
+            'valeur_actuelle': float(row['valeur_actuelle']),
+            'valeur_projetee': float(row['valeur_projetee']),
             'is_a_provisionner': bool(row['is_a_provisionner'])
-        })
+        }
+        
+        # Calculer les valeurs dérivées qui sont attendues par l'application
+        variation_brute = (actif['valeur_projetee'] - actif['valeur_actuelle']) * actif['pct_detention']
+        
+        # Appliquer la règle de l'IS (75% de l'impact en cas de plus-value)
+        if actif['is_a_provisionner'] and variation_brute > 0:
+            variation = variation_brute * 0.75  # Réduction de 25% pour l'IS
+        else:
+            variation = variation_brute  # Pas de modification en cas de moins-value ou si IS non provisionné
+        
+        actif['variation'] = variation
+        actif['variation_brute'] = variation_brute
+        
+        params['actifs'].append(actif)
     
     conn.close()
+    
+    # Logging pour debug
+    print(f"Paramètres chargés: {params}")
+    
     return params
 
 def lister_simulations():
@@ -960,7 +1040,6 @@ if st.sidebar.button("📤 Exporter les paramètres JSON"):
     nom_fichier_json = f"{date_aujourd_hui} - Atterrissage VL - {nom_fonds}.json"
     json_export = json.dumps(export_data, indent=2).encode('utf-8')
     st.sidebar.download_button("Télécharger paramètres JSON", json_export, file_name=nom_fichier_json)
-
 
 # === BOUTON RÉINITIALISATION ===
 if st.sidebar.button("♻️ Réinitialiser les paramètres"):
