@@ -106,7 +106,7 @@ try:
         couleur_bleue = "#0000DC"
         ax.plot(dates_semestres, vl_semestres, marker='o', linewidth=2.5, color=couleur_bleue)
         for i, txt in enumerate(vl_semestres):
-            ax.annotate(f"{txt:,.2f} €".replace(",", " ").replace(".", ","),
+            ax.annotate(f"{float(txt):,.2f} €".replace(",", " ").replace(".", ","),
                         (dates_semestres[i], vl_semestres[i]),
                         textcoords="offset points", xytext=(0, 10), ha='center', fontsize=9,
                         bbox=dict(boxstyle="round,pad=0.3", fc=couleur_bleue, ec=couleur_bleue, alpha=0.9), color='white')
@@ -159,7 +159,7 @@ try:
             couleur_bleue = "#0000DC"
             ax.plot(dates_semestres, vl_semestres, marker='o', linewidth=2.5, color=couleur_bleue)
             for i, txt in enumerate(vl_semestres):
-                ax.annotate(f"{txt:,.2f} €".replace(",", " ").replace(".", ","),
+                ax.annotate(f"{float(txt):,.2f} €".replace(",", " ").replace(".", ","),
                             (dates_semestres[i], vl_semestres[i]),
                             textcoords="offset points", xytext=(0, 10), ha='center', fontsize=8,
                             bbox=dict(boxstyle="round,pad=0.3", fc=couleur_bleue, ec=couleur_bleue, alpha=0.9), color='white')
