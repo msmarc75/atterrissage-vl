@@ -279,8 +279,8 @@ with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
         # Appliquer la largeur (avec décalage)
         worksheet.set_column(idx + col_offset, idx + col_offset, max_len)
         
-        # Appliquer le format monétaire si la colonne contient "€"
-        if "€" in col or any(s in col for s in ["Impact", "Actif", "VL"]):
+                        # Appliquer le format monétaire si la colonne contient "€"
+        if "€" in col or any(s in col for s in ["Impact", "Actif"]):
             # Écrire comme nombres réels avec format monétaire
             for row_num in range(len(projection)):
                 cell_value = projection.iloc[row_num, idx]
@@ -299,6 +299,25 @@ with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                     worksheet.write_number(row_num + row_offset + 1, idx + col_offset, numeric_value, negative_money_format)
                 else:
                     worksheet.write_number(row_num + row_offset + 1, idx + col_offset, numeric_value, money_format)
+        # Format spécial pour les colonnes VL - nombre à deux décimales
+        elif "VL" in col:
+            for row_num in range(len(projection)):
+                cell_value = projection.iloc[row_num, idx]
+                
+                # Extraire la valeur numérique
+                if isinstance(cell_value, str) and "€" in cell_value:
+                    numeric_value = float(cell_value.replace(" ", "").replace("€", "").replace(",", "."))
+                else:
+                    try:
+                        numeric_value = float(cell_value)
+                    except (ValueError, TypeError):
+                        numeric_value = 0
+                
+                # Format nombre à deux décimales pour VL
+                if numeric_value < 0:
+                    worksheet.write_number(row_num + row_offset + 1, idx + col_offset, numeric_value, negative_number_format)
+                else:
+                    worksheet.write_number(row_num + row_offset + 1, idx + col_offset, numeric_value, number_format)
         else:
             # Pour les autres colonnes (non monétaires) - avec décalage
             for row_num in range(len(projection)):
