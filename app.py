@@ -221,13 +221,10 @@ for i, date in enumerate(dates_semestres):
     for a in actifs:
         var = a['variation'] if i == 1 else 0
         
-        # Si IS à provisionner et il s'agit d'une plus-value, afficher le montant net et brut
+        # Si IS à provisionner et il s'agit d'une plus-value, afficher uniquement le montant net
         if i == 1 and a['is_a_provisionner'] and a['variation_brute'] > 0:
-            # Format des montants bruts et nets pour affichage
-            montant_brut = format_fr_euro(a['variation_brute'])
-            montant_net = format_fr_euro(var)
-            is_info = f"brut: {montant_brut} | net: {montant_net}"
-            row[f"Actif - {a['nom']}"] = is_info
+            # Afficher seulement le montant net, sans texte supplémentaire
+            row[f"Actif - {a['nom']}"] = format_fr_euro(var)
         else:
             row[f"Actif - {a['nom']}"] = format_fr_euro(var)
             
