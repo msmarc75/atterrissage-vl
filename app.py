@@ -348,7 +348,7 @@ def lister_simulations():
     # Vérifier si la colonne nom_scenario existe déjà dans la table
     c.execute("PRAGMA table_info(simulations)")
     colonnes = c.fetchall()
-    colonnes_noms = [col['name'] for col in colonnes]
+    colonnes_noms = [col[1] for col in colonnes]  # Indice 1 pour le nom de colonne
     
     if 'nom_scenario' in colonnes_noms:
         # Si la colonne existe, on l'inclut dans la requête
@@ -363,8 +363,36 @@ def lister_simulations():
         FROM simulations ORDER BY date_creation DESC
         """)
     
-    simulations = [dict(row) for row in c.fetchall()]
+    simulations = []
+    for row in c.fetchall():
+        # Convertir en dictionnaire
+        sim_dict = dict(row)
+        
+        # Nettoyer le nom du fonds (enlever les dates potentielles)
+        if sim_dict['nom_fonds'] and '(' in sim_dict['nom_fonds']:
+            # Si le nom contient une parenthèse (comme une date), prendre juste la partie avant
+            sim_dict['nom_fonds'] = sim_dict['nom_fonds'].split('(')[0].strip()
+        
+        # Assurer qu'il y a un nom_scenario
+        if 'nom_scenario' not in sim_dict or not sim_dict['nom_scenario']:
+            # Essayer d'extraire du commentaire
+            if sim_dict['commentaire'] and ' - ' in sim_dict['commentaire']:
+                sim_dict['nom_scenario'] = sim_dict['commentaire'].split(' - ')[0].strip()
+            else:
+                sim_dict['nom_scenario'] = 'Base case'
+        
+        simulations.append(sim_dict)
+    
     conn.close()
+    
+    # Déboguer - afficher les infos importantes pour chaque simulation
+    for i, sim in enumerate(simulations):
+        print(f"Simulation #{i+1}:")
+        print(f"  ID: {sim['id']}")
+        print(f"  Nom fonds: '{sim['nom_fonds']}'")
+        print(f"  Nom scénario: '{sim['nom_scenario']}'")
+        print(f"  Commentaire: '{sim['commentaire']}'")
+        print("------------------------")
     
     return simulations
 
@@ -514,21 +542,22 @@ with st.sidebar.expander("💾 Sauvegarder la simulation"):
         simulations = lister_simulations()
         
         if simulations:
-            # Format d'affichage pour les simulations existantes
+            # Format d'affichage simplifié pour les simulations existantes
             options = {}
             for s in simulations:
-                date_creation = datetime.strptime(s['date_creation'], "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y")
-                
+                # Récupérer le nom du scénario
                 if 'nom_scenario' in s and s['nom_scenario']:
                     scenario = s['nom_scenario']
                 else:
+                    # Essayer d'extraire du commentaire
                     commentaire = s['commentaire'] if s['commentaire'] else "Sans nom"
                     if ' - ' in commentaire:
                         scenario = commentaire.split(' - ')[0]
                     else:
                         scenario = commentaire
                 
-                display_text = f"[{scenario}] - {s['nom_fonds']} ({date_creation})"
+                # Format simplifié: Nom du fonds - Nom du scénario
+                display_text = f"{s['nom_fonds']} - {scenario}"
                 options[display_text] = s['id']
                 
             sim_a_mettre_a_jour = st.selectbox(
