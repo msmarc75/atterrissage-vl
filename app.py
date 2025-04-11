@@ -83,7 +83,11 @@ with st.sidebar.expander("🔁 Impacts récurrents (même chaque semestre)", exp
     for i in range(nb_impacts_rec):
         libelle_defaut, montant_defaut = params['impacts_recurrents'][i] if i < len(params['impacts_recurrents']) else (f"Impact récurrent {i+1}", 0.0)
         libelle = st.text_input(f"Libellé impact récurrent {i+1}", libelle_defaut)
-        montant = float(str(st.text_input(f"Montant impact récurrent {i+1} (€)", f"{montant_defaut:,.2f}"))
+        montant_str = st.text_input(f"Montant impact récurrent {i+1} (€)", f"{montant_defaut:,.2f}")
+        try:
+            montant = float(montant_str.replace(" ", "").replace(",", ".").replace("€", "") or 0)
+        except ValueError:
+            montant = 0.0
                         .replace(" ", "").replace(",", ".").replace("€", "") or 0)
         impacts_recurrents.append((libelle, montant))
 
@@ -105,7 +109,11 @@ with st.sidebar.expander("📅 Impacts spécifiques (montants par semestre)", ex
         for d in dates_semestres[1:]:
             key = d.strftime('%d/%m/%Y')
             val_def = montants_defaut.get(key, 0.0)
-            montant = float(str(st.text_input(f"{libelle} ({key})", f"{val_def:,.2f}"))
+            montant_str = st.text_input(f"{libelle} ({key})", f"{val_def:,.2f}")
+            try:
+                montant = float(montant_str.replace(" ", "").replace(",", ".").replace("€", "") or 0)
+            except ValueError:
+                montant = 0.0
                             .replace(" ", "").replace(",", ".").replace("€", "") or 0)
             montants_par_semestre[key] = montant
         impacts_specifiques.append({"libelle": libelle, "montants": montants_par_semestre})
