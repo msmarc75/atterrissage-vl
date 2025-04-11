@@ -468,8 +468,10 @@ if st.sidebar.button("📤 Exporter les paramètres JSON"):
         "impacts": impacts,
         "actifs": actifs
     }
+    date_aujourd_hui = datetime.now().strftime("%Y%m%d")
+    nom_fichier_json = f"{date_aujourd_hui} - Atterrissage VL - {nom_fonds}.json"
     json_export = json.dumps(export_data, indent=2).encode('utf-8')
-    st.sidebar.download_button("Télécharger paramètres JSON", json_export, file_name="parametres_vl.json")
+    st.sidebar.download_button("Télécharger paramètres JSON", json_export, file_name=nom_fichier_json)
 
 # === BOUTON RÉINITIALISATION ===
 if st.sidebar.button("♻️ Réinitialiser les paramètres"):
