@@ -451,9 +451,15 @@ st.sidebar.header("Gestion des simulations en BDD")
 
 # Option pour sauvegarder la simulation actuelle
 with st.sidebar.expander("💾 Sauvegarder la simulation"):
-    # Récupérer les valeurs actuelles
-    current_nom_fonds = nom_fonds
-    current_nom_scenario = nom_scenario
+    # Récupérer les valeurs actuelles de manière sécurisée
+    current_nom_fonds = params.get('nom_fonds', "Nom du Fonds")
+    current_nom_scenario = params.get('nom_scenario', "Base case")
+    
+    # Vérifier si les variables locales existent et les utiliser si c'est le cas
+    if 'nom_fonds' in locals() and nom_fonds:
+        current_nom_fonds = nom_fonds
+    if 'nom_scenario' in locals() and nom_scenario:
+        current_nom_scenario = nom_scenario
     
     # Option pour créer une nouvelle sauvegarde ou mettre à jour
     mode_sauvegarde = st.radio(
