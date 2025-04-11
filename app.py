@@ -18,13 +18,36 @@ def init_db():
         CREATE TABLE IF NOT EXISTS simulations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nom_fonds TEXT NOT NULL,
-            nom_scenario TEXT DEFAULT 'Base case',
             date_vl_connue TEXT NOT NULL,
             date_fin_fonds TEXT NOT NULL,
             anr_derniere_vl REAL NOT NULL,
             nombre_parts REAL NOT NULL,
             date_creation TIMESTAMP NOT NULL,
             commentaire TEXT
+        )
+        ''')
+        
+        # Vérifier si la colonne nom_scenario existe déjà dans la table
+        c.execute("PRAGMA table_info(simulations)")
+        colonnes = c.fetchall()
+        colonnes_noms = [col[1] for col in colonnes]  # Indice 1 pour le nom de colonne
+        
+        # Si la colonne n'existe pas, l'ajouter
+        if 'nom_scenario' not in colonnes_noms:
+            c.execute('''
+            ALTER TABLE simulations 
+            ADD COLUMN nom_scenario TEXT DEFAULT 'Base case'
+            ''')
+            print("Colonne nom_scenario ajoutée à la table simulations")
+        
+        # Table pour les impacts récurrents
+        c.execute('''
+        CREATE TABLE IF NOT EXISTS impacts_recurrents (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            simulation_id INTEGER NOT NULL,
+            libelle TEXT NOT NULL,
+            montant REAL NOT NULL,
+            FOREIGN KEY (simulation_id) REFERENCES simulations (id) ON DELETE CASCADE
         )
         ''')
         
@@ -108,22 +131,48 @@ def sauvegarder_simulation(params, commentaire=""):
         # Récupérer le nom du scénario, utiliser "Base case" par défaut
         nom_scenario = params.get('nom_scenario', 'Base case')
         
-        # Insérer les paramètres généraux
-        c.execute('''
-        INSERT INTO simulations (
-            nom_fonds, nom_scenario, date_vl_connue, date_fin_fonds, 
-            anr_derniere_vl, nombre_parts, date_creation, commentaire
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            params['nom_fonds'],
-            nom_scenario, 
-            params['date_vl_connue'], 
-            params['date_fin_fonds'],
-            anr, 
-            parts, 
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            commentaire
-        ))
+        # Vérifier si la colonne nom_scenario existe dans la table
+        c.execute("PRAGMA table_info(simulations)")
+        colonnes = c.fetchall()
+        colonnes_noms = [col[1] for col in colonnes]  # Indice 1 pour le nom de colonne
+        
+        # Préparer la requête d'insertion en fonction des colonnes disponibles
+        if 'nom_scenario' in colonnes_noms:
+            # Si la colonne existe, l'inclure dans l'insertion
+            c.execute('''
+            INSERT INTO simulations (
+                nom_fonds, nom_scenario, date_vl_connue, date_fin_fonds, 
+                anr_derniere_vl, nombre_parts, date_creation, commentaire
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                params['nom_fonds'],
+                nom_scenario, 
+                params['date_vl_connue'], 
+                params['date_fin_fonds'],
+                anr, 
+                parts, 
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                commentaire
+            ))
+        else:
+            # Si la colonne n'existe pas, l'omettre de l'insertion
+            c.execute('''
+            INSERT INTO simulations (
+                nom_fonds, date_vl_connue, date_fin_fonds, 
+                anr_derniere_vl, nombre_parts, date_creation, commentaire
+            ) VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (
+                params['nom_fonds'], 
+                params['date_vl_connue'], 
+                params['date_fin_fonds'],
+                anr, 
+                parts, 
+                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                commentaire
+            ))
+            # Stocker le nom du scénario dans le commentaire
+            print(f"Colonne nom_scenario manquante, scénario '{nom_scenario}' stocké dans le commentaire")
+        
         
         simulation_id = c.lastrowid
         
