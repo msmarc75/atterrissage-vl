@@ -382,7 +382,7 @@ st.sidebar.header("Gestion des simulations en BDD")
 
 # Option pour sauvegarder la simulation actuelle
 with st.sidebar.expander("💾 Sauvegarder la simulation actuelle"):
-    commentaire = st.text_area("Commentaire (optionnel)", "")
+    nom_scenario = st.text_input("Nom du scénario", "")
     if st.button("Sauvegarder dans la BDD"):
         # Préparer les données à sauvegarder
         export_data = {
@@ -396,9 +396,17 @@ with st.sidebar.expander("💾 Sauvegarder la simulation actuelle"):
             "actifs": actifs if 'actifs' in locals() else params['actifs']
         }
         
-        # Sauvegarder dans la BDD
+        # Date au format jour/mois/année
+        date_formatee = datetime.now().strftime("%d/%m/%Y")
+        
+        # Sauvegarder dans la BDD avec le commentaire formaté
+        commentaire = f"{nom_scenario} - {date_formatee}"
         simulation_id = sauvegarder_simulation(export_data, commentaire)
-        st.sidebar.success(f"Simulation sauvegardée avec ID: {simulation_id}")
+        
+        if simulation_id:
+            st.sidebar.success(f"Simulation '{nom_scenario}' sauvegardée avec succès")
+        else:
+            st.sidebar.error("Échec de la sauvegarde, veuillez réessayer")
 
 # Option pour charger une simulation existante
 with st.sidebar.expander("📂 Charger une simulation"):
