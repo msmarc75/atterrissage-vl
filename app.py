@@ -650,18 +650,20 @@ with st.sidebar.expander("📂 Charger une simulation"):
         )
         
         col1, col2 = st.columns(2)
-        with col1:
-            if st.button("Charger cette simulation"):
-                simulation_id = options[sim_selectionnee]
-                params_charges = charger_simulation(simulation_id)
-                st.session_state.params = params_charges
-                st.rerun()
+
+    with col1:
+    if st.button("Charger cette simulation"):
+        simulation_id = options[sim_selectionnee]  # Cette ligne et les suivantes doivent être indentées
+        params_charges = charger_simulation(simulation_id)
+        st.session_state.params = params_charges
+        st.rerun()
+        
         with col2:
             if st.button("🗑️ Supprimer"):
-simulation_id = options[sim_selectionnee]
-                supprimer_simulation(simulation_id)
-                st.success("Simulation supprimée avec succès")
-                st.rerun()
+            simulation_id = options[sim_selectionnee]
+            supprimer_simulation(simulation_id)
+            st.success("Simulation supprimée avec succès")
+            st.rerun()
     else:
         st.info("Aucune simulation sauvegardée")
 
