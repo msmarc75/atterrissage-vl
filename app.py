@@ -63,21 +63,18 @@ if submitted:
     anr_derniere_vl = float(anr_derniere_vl_str.replace(" ", "").replace(",", ".").replace("€", "") or 0)
     nombre_parts = float(nombre_parts_str.replace(" ", "").replace(",", ".") or 0)
 
-    
-# Exécution seulement si le formulaire est validé
-if submitted:
-    # === DATES SEMESTRES ===
-    datetime(y, 12, 31))
+    date_vl_connue = datetime.strptime(date_vl_connue_str, "%d/%m/%Y")
+    date_fin_fonds = datetime.strptime(date_fin_fonds_str, "%d/%m/%Y")
+    dates_semestres = [date_vl_connue]
+    y = date_vl_connue.year
+    while datetime(y, 12, 31) <= date_fin_fonds:
+        if datetime(y, 6, 30) > date_vl_connue:
+            dates_semestres.append(datetime(y, 6, 30))
+        if datetime(y, 12, 31) > date_vl_connue:
+            dates_semestres.append(datetime(y, 12, 31))
         y += 1
-date_fin_fonds = datetime.strptime(date_fin_fonds_str, "%d/%m/%Y")
-dates_semestres = [date_vl_connue]
-y = date_vl_connue.year
-while datetime(y, 12, 31) <= date_fin_fonds:
-    if datetime(y, 6, 30) > date_vl_connue:
-        dates_semestres.append(datetime(y, 6, 30))
-    if datetime(y, 12, 31) > date_vl_connue:
-        dates_semestres.append(datetime(y, 12, 31))
-    y += 1
+
+    
 
 # === SIDEBAR : IMPACTS RÉCURRENTS ===
 with st.sidebar.expander("🔁 Impacts récurrents (même chaque semestre)", expanded=expand_all):
