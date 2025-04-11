@@ -220,9 +220,6 @@ with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
     # Créer un onglet "Atterrissage VL" à la place de "Projection"
     worksheet = workbook.add_worksheet('Atterrissage VL')
     
-    # Couleur bleue pour l'onglet
-    worksheet.set_tab_color('#0000DC')
-    
     # Formats pour l'Excel
     header_format = workbook.add_format({
         'bold': True,
