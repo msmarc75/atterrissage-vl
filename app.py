@@ -1226,6 +1226,7 @@ if st.sidebar.button("📤 Exporter les paramètres JSON"):
     json_export = json.dumps(export_data, indent=2).encode('utf-8')
     st.sidebar.download_button("Télécharger paramètres JSON", json_export, file_name=nom_fichier_json)
 
+
 # === BOUTON RÉINITIALISATION ===
 if st.sidebar.button("♻️ Réinitialiser les paramètres"):
     st.session_state.params = default_params.copy()
