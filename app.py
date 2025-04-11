@@ -1,7 +1,7 @@
 import streamlit as st
 import pandas as pd
 import json
-from datetime import datetime
+from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import io
@@ -447,10 +447,13 @@ with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
 buffer.seek(0)
 
 # Simplification des boutons d'exportation (retiré l'export PDF)
+date_aujourd_hui = datetime.now().strftime("%Y%m%d")
+nom_fichier_excel = f"{date_aujourd_hui}_atterrissage_vl_{nom_fonds.replace(' ', '_').lower()}.xlsx"
+
 st.download_button(
     label="📥 Exporter la projection avec graphique Excel",
     data=buffer,
-    file_name="projection_vl.xlsx",
+    file_name=nom_fichier_excel,
     mime="application/vnd.ms-excel"
 )
 
