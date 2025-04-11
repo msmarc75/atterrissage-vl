@@ -448,7 +448,7 @@ buffer.seek(0)
 
 # Simplification des boutons d'exportation (retiré l'export PDF)
 date_aujourd_hui = datetime.now().strftime("%Y%m%d")
-nom_fichier_excel = f"{date_aujourd_hui}_atterrissage_vl_{nom_fonds.replace(' ', '_').lower()}.xlsx"
+nom_fichier_excel = f"{date_aujourd_hui} - Atterrissage VL - {nom_fonds}.xlsx"
 
 st.download_button(
     label="📥 Exporter la projection avec graphique Excel",
