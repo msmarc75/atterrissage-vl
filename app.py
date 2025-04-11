@@ -178,15 +178,32 @@ for i in range(nb_actifs):
         pct_detention = float(pct_text.replace(",", "."))
     except ValueError:
         pct_detention = pct_defaut  # En cas d'erreur, utiliser la valeur par défaut
+    
+    # Option pour provisionner l'IS
+    is_a_provisionner = False
+    if i < len(params['actifs']) and 'is_a_provisionner' in params['actifs'][i]:
+        is_a_provisionner = params['actifs'][i]['is_a_provisionner']
+    is_a_provisionner = st.sidebar.checkbox(f"IS à provisionner pour Actif {i+1} ?", value=is_a_provisionner)
+    
     valeur_actuelle = champ_numerique(f"Valeur actuelle Actif {i+1} (€)", val_actuelle)
     valeur_projetee = champ_numerique(f"Valeur projetée en S+1 Actif {i+1} (€)", val_proj)
-    variation = (valeur_projetee - valeur_actuelle) * (pct_detention / 100)
+    
+    # Calcul de la variation avec prise en compte de l'IS si nécessaire
+    variation_brute = (valeur_projetee - valeur_actuelle) * (pct_detention / 100)
+    
+    # Appliquer la règle de l'IS (75% de l'impact en cas de plus-value)
+    if is_a_provisionner and variation_brute > 0:
+        variation = variation_brute * 0.75  # Réduction de 25% pour l'IS
+    else:
+        variation = variation_brute  # Pas de modification en cas de moins-value ou si IS non provisionné
     actifs.append({
         "nom": nom_actif,
         "pct_detention": pct_detention / 100,
         "valeur_actuelle": valeur_actuelle,
         "valeur_projetee": valeur_projetee,
-        "variation": variation
+        "variation": variation,
+        "is_a_provisionner": is_a_provisionner,
+        "variation_brute": variation_brute
     })
 
 # === CALCUL PROJECTION DÉTAILLÉE ===
@@ -202,7 +219,17 @@ for i, date in enumerate(dates_semestres):
     total_var_actifs = 0
     for a in actifs:
         var = a['variation'] if i == 1 else 0
-        row[f"Actif - {a['nom']}"] = format_fr_euro(var)
+        
+        # Si IS à provisionner et il s'agit d'une plus-value, afficher le montant net et brut
+        if i == 1 and a['is_a_provisionner'] and a['variation_brute'] > 0:
+            # Format des montants bruts et nets pour affichage
+            montant_brut = format_fr_euro(a['variation_brute'])
+            montant_net = format_fr_euro(var)
+            is_info = f"brut: {montant_brut} | net: {montant_net}"
+            row[f"Actif - {a['nom']}"] = is_info
+        else:
+            row[f"Actif - {a['nom']}"] = format_fr_euro(var)
+            
         total_var_actifs += var
 
     # Impacts récurrents
