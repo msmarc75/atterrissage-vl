@@ -26,8 +26,10 @@ default_params = {
     "anr_derniere_vl": 10_000_000.0,
     "nombre_parts": 10_000.0,
     "impacts": [
-        ("Frais corporate", -50_000.0),
-        ("Honoraires NIV", -30_000.0)
+        ("Frais corporate", -50_000.0)
+    ],
+    "impacts_ponctuels": [
+        {"libelle": "Honoraires NIV", "montant": -30_000.0, "date": "30/06/2025"}
     ],
     "actifs": []
 }
@@ -51,18 +53,69 @@ date_fin_fonds_str = st.sidebar.text_input("Date fin de fonds (jj/mm/aaaa)", par
 anr_derniere_vl = champ_numerique("ANR dernière VL connue (€)", params['anr_derniere_vl'])
 nombre_parts = champ_numerique("Nombre de parts", params['nombre_parts'])
 
-# Impacts personnalisés
-st.sidebar.header("Impacts semestriels personnalisés")
+# === DATES & PROJECTION ===
+date_vl_connue = datetime.strptime(date_vl_connue_str, "%d/%m/%Y")
+date_fin_fonds = datetime.strptime(date_fin_fonds_str, "%d/%m/%Y")
+
+dates_semestres = [date_vl_connue]
+y = date_vl_connue.year
+while datetime(y, 12, 31) <= date_fin_fonds:
+    if datetime(y, 6, 30) > date_vl_connue:
+        dates_semestres.append(datetime(y, 6, 30))
+    if datetime(y, 12, 31) > date_vl_connue:
+        dates_semestres.append(datetime(y, 12, 31))
+    y += 1
+
+# Impacts personnalisés récurrents
+st.sidebar.header("Impacts semestriels récurrents")
 impacts = []
-nb_impacts = st.sidebar.number_input("Nombre d'impacts", min_value=0, value=len(params['impacts']), step=1)
+nb_impacts = st.sidebar.number_input("Nombre d'impacts récurrents", min_value=0, value=len(params['impacts']), step=1)
 for i in range(nb_impacts):
     if i < len(params['impacts']):
         libelle_defaut, montant_defaut = params['impacts'][i]
     else:
-        libelle_defaut, montant_defaut = f"Impact {i+1}", 0.0
-    libelle = st.sidebar.text_input(f"Libellé impact {i+1}", libelle_defaut)
-    montant = champ_numerique(f"Montant semestriel impact {i+1} (€)", montant_defaut)
+        libelle_defaut, montant_defaut = f"Impact récurrent {i+1}", 0.0
+    libelle = st.sidebar.text_input(f"Libellé impact récurrent {i+1}", libelle_defaut)
+    montant = champ_numerique(f"Montant semestriel impact récurrent {i+1} (€)", montant_defaut)
     impacts.append((libelle, montant))
+
+# Impacts ponctuels sur date spécifique
+st.sidebar.header("Impacts ponctuels")
+impacts_ponctuels = []
+nb_impacts_ponctuels = st.sidebar.number_input("Nombre d'impacts ponctuels", min_value=0, 
+                                             value=len(params.get('impacts_ponctuels', [])), step=1)
+
+# Création de la liste des dates formatées pour le selectbox
+dates_semestres_str = [d.strftime("%d/%m/%Y") for d in dates_semestres]
+
+for i in range(nb_impacts_ponctuels):
+    st.sidebar.subheader(f"Impact ponctuel {i+1}")
+    
+    if i < len(params.get('impacts_ponctuels', [])):
+        impact_default = params['impacts_ponctuels'][i]
+        libelle_defaut = impact_default['libelle']
+        montant_defaut = impact_default['montant']
+        date_defaut = impact_default['date']
+        # Trouver l'index de la date par défaut dans la liste des dates formatées
+        date_index = dates_semestres_str.index(date_defaut) if date_defaut in dates_semestres_str else 0
+    else:
+        libelle_defaut = f"Impact ponctuel {i+1}"
+        montant_defaut = 0.0
+        date_index = 0
+    
+    libelle = st.sidebar.text_input(f"Libellé impact ponctuel {i+1}", libelle_defaut)
+    montant = champ_numerique(f"Montant impact ponctuel {i+1} (€)", montant_defaut)
+    date_str = st.sidebar.selectbox(
+        f"Date impact ponctuel {i+1}",
+        options=dates_semestres_str,
+        index=date_index
+    )
+    
+    impacts_ponctuels.append({
+        "libelle": libelle,
+        "montant": montant,
+        "date": date_str
+    })
 
 # Actifs
 st.sidebar.header("Ajouter des Actifs")
@@ -95,19 +148,6 @@ for i in range(nb_actifs):
         "variation": variation
     })
 
-# === DATES & PROJECTION ===
-date_vl_connue = datetime.strptime(date_vl_connue_str, "%d/%m/%Y")
-date_fin_fonds = datetime.strptime(date_fin_fonds_str, "%d/%m/%Y")
-
-dates_semestres = [date_vl_connue]
-y = date_vl_connue.year
-while datetime(y, 12, 31) <= date_fin_fonds:
-    if datetime(y, 6, 30) > date_vl_connue:
-        dates_semestres.append(datetime(y, 6, 30))
-    if datetime(y, 12, 31) > date_vl_connue:
-        dates_semestres.append(datetime(y, 12, 31))
-    y += 1
-
 # === CALCUL PROJECTION DÉTAILLÉE ===
 vl_semestres = []
 anr_courant = anr_derniere_vl
@@ -115,6 +155,7 @@ projection_rows = []
 
 for i, date in enumerate(dates_semestres):
     row = {"Date": date.strftime('%d/%m/%Y')}
+    date_str = date.strftime('%d/%m/%Y')
 
     # Variation par actif (S+1 uniquement)
     total_var_actifs = 0
@@ -124,13 +165,27 @@ for i, date in enumerate(dates_semestres):
         total_var_actifs += var
 
     # Impacts récurrents
-    total_impacts = 0
+    total_impacts_recurrents = 0
     for libelle, montant in impacts:
-        row[f"Impact - {libelle}"] = format_fr_euro(montant)
-        total_impacts += montant
+        if i > 0:  # Appliquer les impacts récurrents à partir de S+1
+            row[f"Impact récurrent - {libelle}"] = format_fr_euro(montant)
+            total_impacts_recurrents += montant
+        else:
+            row[f"Impact récurrent - {libelle}"] = format_fr_euro(0)
+
+    # Impacts ponctuels pour cette date spécifique
+    total_impacts_ponctuels = 0
+    for impact in impacts_ponctuels:
+        if impact['date'] == date_str:
+            row[f"Impact ponctuel - {impact['libelle']}"] = format_fr_euro(impact['montant'])
+            total_impacts_ponctuels += impact['montant']
+        else:
+            row[f"Impact ponctuel - {impact['libelle']}"] = format_fr_euro(0)
 
     if i > 0:
-        anr_courant += total_var_actifs + total_impacts
+        anr_courant += total_var_actifs + total_impacts_recurrents
+    # Toujours appliquer les impacts ponctuels, même à S+0
+    anr_courant += total_impacts_ponctuels
 
     vl = anr_courant / nombre_parts
     # Arrondir à deux décimales
@@ -287,7 +342,7 @@ with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
         # Appliquer la largeur (avec décalage)
         worksheet.set_column(idx + col_offset, idx + col_offset, max_len)
         
-                        # Appliquer le format monétaire si la colonne contient "€"
+        # Appliquer le format monétaire si la colonne contient "€"
         if "€" in col or any(s in col for s in ["Impact", "Actif"]):
             # Écrire comme nombres réels avec format monétaire
             for row_num in range(len(projection)):
@@ -468,6 +523,7 @@ if st.sidebar.button("📤 Exporter les paramètres JSON"):
         "anr_derniere_vl": anr_derniere_vl,
         "nombre_parts": nombre_parts,
         "impacts": impacts,
+        "impacts_ponctuels": impacts_ponctuels,
         "actifs": actifs
     }
     date_aujourd_hui = datetime.now().strftime("%Y%m%d")
