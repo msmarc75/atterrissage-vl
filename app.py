@@ -617,7 +617,7 @@ with st.sidebar.expander("📂 Charger une simulation"):
     simulations = lister_simulations()
     
     if simulations:
-        options = {f"{s['nom_fonds']} ({s['date_creation']})": s['id'] for s in simulations}
+        options = {f"{s['nom_fonds']} - {s['nom_scenario']}": s['id'] for s in simulations}
         sim_selectionnee = st.selectbox(
             "Choisir une simulation à charger",
             options=list(options.keys())
