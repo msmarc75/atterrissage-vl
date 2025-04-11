@@ -1,10 +1,255 @@
 import streamlit as st
 import pandas as pd
 import json
+import sqlite3
 from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import io
+
+# === INITIALISATION DE LA BASE DE DONNÉES ===
+def init_db():
+    conn = sqlite3.connect('simulations_fonds.db')
+    c = conn.cursor()
+    
+    # Table principale pour les paramètres généraux
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS simulations (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nom_fonds TEXT,
+        date_vl_connue TEXT,
+        date_fin_fonds TEXT,
+        anr_derniere_vl REAL,
+        nombre_parts REAL,
+        date_creation TIMESTAMP,
+        commentaire TEXT
+    )
+    ''')
+    
+    # Table pour les impacts récurrents
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS impacts_recurrents (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        simulation_id INTEGER,
+        libelle TEXT,
+        montant REAL,
+        FOREIGN KEY (simulation_id) REFERENCES simulations (id)
+    )
+    ''')
+    
+    # Table pour les impacts multidates
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS impacts_multidates (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        simulation_id INTEGER,
+        libelle TEXT,
+        FOREIGN KEY (simulation_id) REFERENCES simulations (id)
+    )
+    ''')
+    
+    # Table pour les occurrences des impacts multidates
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS occurrences_impacts (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        impact_multidate_id INTEGER,
+        date TEXT,
+        montant REAL,
+        FOREIGN KEY (impact_multidate_id) REFERENCES impacts_multidates (id)
+    )
+    ''')
+    
+    # Table pour les actifs
+    c.execute('''
+    CREATE TABLE IF NOT EXISTS actifs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        simulation_id INTEGER,
+        nom TEXT,
+        pct_detention REAL,
+        valeur_actuelle REAL,
+        valeur_projetee REAL,
+        is_a_provisionner BOOLEAN,
+        FOREIGN KEY (simulation_id) REFERENCES simulations (id)
+    )
+    ''')
+    
+    conn.commit()
+    conn.close()
+
+# Fonctions pour la gestion des simulations en base de données
+def sauvegarder_simulation(params, commentaire=""):
+    conn = sqlite3.connect('simulations_fonds.db')
+    c = conn.cursor()
+    
+    # Insérer les paramètres généraux
+    c.execute('''
+    INSERT INTO simulations (
+        nom_fonds, date_vl_connue, date_fin_fonds, 
+        anr_derniere_vl, nombre_parts, date_creation, commentaire
+    ) VALUES (?, ?, ?, ?, ?, ?, ?)
+    ''', (
+        params['nom_fonds'], 
+        params['date_vl_connue'], 
+        params['date_fin_fonds'],
+        params['anr_derniere_vl'], 
+        params['nombre_parts'], 
+        datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        commentaire
+    ))
+    
+    simulation_id = c.lastrowid
+    
+    # Insérer les impacts récurrents
+    for libelle, montant in params['impacts']:
+        c.execute('''
+        INSERT INTO impacts_recurrents (simulation_id, libelle, montant)
+        VALUES (?, ?, ?)
+        ''', (simulation_id, libelle, montant))
+    
+    # Insérer les impacts multidates
+    for impact in params['impacts_multidates']:
+        c.execute('''
+        INSERT INTO impacts_multidates (simulation_id, libelle)
+        VALUES (?, ?)
+        ''', (simulation_id, impact['libelle']))
+        
+        impact_id = c.lastrowid
+        
+        # Insérer les occurrences de cet impact
+        for occurrence in impact['montants']:
+            c.execute('''
+            INSERT INTO occurrences_impacts (impact_multidate_id, date, montant)
+            VALUES (?, ?, ?)
+            ''', (impact_id, occurrence['date'], occurrence['montant']))
+    
+    # Insérer les actifs
+    for actif in params['actifs']:
+        c.execute('''
+        INSERT INTO actifs (
+            simulation_id, nom, pct_detention, 
+            valeur_actuelle, valeur_projetee, is_a_provisionner
+        ) VALUES (?, ?, ?, ?, ?, ?)
+        ''', (
+            simulation_id, 
+            actif['nom'], 
+            actif['pct_detention'],
+            actif['valeur_actuelle'], 
+            actif['valeur_projetee'], 
+            actif.get('is_a_provisionner', False)
+        ))
+    
+    conn.commit()
+    conn.close()
+    
+    return simulation_id
+
+def charger_simulation(simulation_id):
+    conn = sqlite3.connect('simulations_fonds.db')
+    conn.row_factory = sqlite3.Row  # Pour accéder aux colonnes par nom
+    c = conn.cursor()
+    
+    # Récupérer les paramètres généraux
+    c.execute("SELECT * FROM simulations WHERE id = ?", (simulation_id,))
+    sim = dict(c.fetchone())
+    
+    # Structure pour stocker les paramètres complets
+    params = {
+        'nom_fonds': sim['nom_fonds'],
+        'date_vl_connue': sim['date_vl_connue'],
+        'date_fin_fonds': sim['date_fin_fonds'],
+        'anr_derniere_vl': sim['anr_derniere_vl'],
+        'nombre_parts': sim['nombre_parts'],
+        'impacts': [],
+        'impacts_multidates': [],
+        'actifs': []
+    }
+    
+    # Récupérer les impacts récurrents
+    c.execute("SELECT libelle, montant FROM impacts_recurrents WHERE simulation_id = ?", (simulation_id,))
+    params['impacts'] = [(row['libelle'], row['montant']) for row in c.fetchall()]
+    
+    # Récupérer les impacts multidates
+    c.execute("SELECT id, libelle FROM impacts_multidates WHERE simulation_id = ?", (simulation_id,))
+    impacts_multidates = c.fetchall()
+    
+    for impact in impacts_multidates:
+        impact_dict = {'libelle': impact['libelle'], 'montants': []}
+        
+        # Récupérer les occurrences pour cet impact
+        c.execute("""
+        SELECT date, montant FROM occurrences_impacts 
+        WHERE impact_multidate_id = ?
+        """, (impact['id'],))
+        
+        impact_dict['montants'] = [
+            {'date': row['date'], 'montant': row['montant']} 
+            for row in c.fetchall()
+        ]
+        
+        params['impacts_multidates'].append(impact_dict)
+    
+    # Récupérer les actifs
+    c.execute("""
+    SELECT nom, pct_detention, valeur_actuelle, valeur_projetee, is_a_provisionner 
+    FROM actifs WHERE simulation_id = ?
+    """, (simulation_id,))
+    
+    for row in c.fetchall():
+        params['actifs'].append({
+            'nom': row['nom'],
+            'pct_detention': row['pct_detention'],
+            'valeur_actuelle': row['valeur_actuelle'],
+            'valeur_projetee': row['valeur_projetee'],
+            'is_a_provisionner': bool(row['is_a_provisionner'])
+        })
+    
+    conn.close()
+    return params
+
+def lister_simulations():
+    conn = sqlite3.connect('simulations_fonds.db')
+    conn.row_factory = sqlite3.Row
+    c = conn.cursor()
+    
+    c.execute("""
+    SELECT id, nom_fonds, date_vl_connue, date_creation, commentaire 
+    FROM simulations ORDER BY date_creation DESC
+    """)
+    
+    simulations = [dict(row) for row in c.fetchall()]
+    conn.close()
+    
+    return simulations
+
+def supprimer_simulation(simulation_id):
+    conn = sqlite3.connect('simulations_fonds.db')
+    c = conn.cursor()
+    
+    # Supprimer les occurrences d'impacts multidates
+    c.execute("""
+        DELETE FROM occurrences_impacts
+        WHERE impact_multidate_id IN (
+            SELECT id FROM impacts_multidates
+            WHERE simulation_id = ?
+        )
+    """, (simulation_id,))
+    
+    # Supprimer les impacts multidates
+    c.execute("DELETE FROM impacts_multidates WHERE simulation_id = ?", (simulation_id,))
+    
+    # Supprimer les impacts récurrents
+    c.execute("DELETE FROM impacts_recurrents WHERE simulation_id = ?", (simulation_id,))
+    
+    # Supprimer les actifs
+    c.execute("DELETE FROM actifs WHERE simulation_id = ?", (simulation_id,))
+    
+    # Supprimer la simulation elle-même
+    c.execute("DELETE FROM simulations WHERE id = ?", (simulation_id,))
+    
+    conn.commit()
+    conn.close()
+
+# Initialiser la base de données au démarrage
+init_db()
 
 st.title("Atterrissage VL")
 
@@ -51,6 +296,56 @@ if params_json is not None:
     st.session_state.params.update(json.load(params_json))
 
 params = st.session_state.params
+
+# === GESTION DES SIMULATIONS ===
+st.sidebar.header("Gestion des simulations en BDD")
+
+# Option pour sauvegarder la simulation actuelle
+with st.sidebar.expander("💾 Sauvegarder la simulation actuelle"):
+    commentaire = st.text_area("Commentaire (optionnel)", "")
+    if st.button("Sauvegarder dans la BDD"):
+        # Préparer les données à sauvegarder
+        export_data = {
+            "nom_fonds": nom_fonds if 'nom_fonds' in locals() else params['nom_fonds'],
+            "date_vl_connue": date_vl_connue_str if 'date_vl_connue_str' in locals() else params['date_vl_connue'],
+            "date_fin_fonds": date_fin_fonds_str if 'date_fin_fonds_str' in locals() else params['date_fin_fonds'],
+            "anr_derniere_vl": anr_derniere_vl if 'anr_derniere_vl' in locals() else params['anr_derniere_vl'],
+            "nombre_parts": nombre_parts if 'nombre_parts' in locals() else params['nombre_parts'],
+            "impacts": impacts if 'impacts' in locals() else params['impacts'],
+            "impacts_multidates": impacts_multidates if 'impacts_multidates' in locals() else params['impacts_multidates'],
+            "actifs": actifs if 'actifs' in locals() else params['actifs']
+        }
+        
+        # Sauvegarder dans la BDD
+        simulation_id = sauvegarder_simulation(export_data, commentaire)
+        st.sidebar.success(f"Simulation sauvegardée avec ID: {simulation_id}")
+
+# Option pour charger une simulation existante
+with st.sidebar.expander("📂 Charger une simulation"):
+    simulations = lister_simulations()
+    
+    if simulations:
+        options = {f"{s['nom_fonds']} ({s['date_creation']})": s['id'] for s in simulations}
+        sim_selectionnee = st.selectbox(
+            "Choisir une simulation à charger",
+            options=list(options.keys())
+        )
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("Charger cette simulation"):
+                simulation_id = options[sim_selectionnee]
+                params_charges = charger_simulation(simulation_id)
+                st.session_state.params = params_charges
+                st.rerun()
+        with col2:
+            if st.button("🗑️ Supprimer"):
+                simulation_id = options[sim_selectionnee]
+                supprimer_simulation(simulation_id)
+                st.success("Simulation supprimée avec succès")
+                st.rerun()
+    else:
+        st.info("Aucune simulation sauvegardée")
 
 # === SAISIE UTILISATEUR ===
 nom_fonds = st.sidebar.text_input("Nom du fonds", params['nom_fonds'])
