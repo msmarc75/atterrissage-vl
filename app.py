@@ -9,7 +9,9 @@ import io
 st.title("Atterrissage VL")
 
 def format_fr_euro(valeur):
-    return f"{valeur:,.2f} €".replace(",", " ").replace(".", ",")
+    # S'assurer que la valeur est arrondie à deux décimales
+    valeur_arrondie = round(valeur, 2)
+    return f"{valeur_arrondie:,.2f} €".replace(",", " ").replace(".", ",")
 
 def champ_numerique(label, valeur):
     champ = st.sidebar.text_input(label, value=format_fr_euro(valeur))
@@ -131,6 +133,8 @@ for i, date in enumerate(dates_semestres):
         anr_courant += total_var_actifs + total_impacts
 
     vl = anr_courant / nombre_parts
+    # Arrondir à deux décimales
+    vl = round(vl, 2)
     vl_semestres.append(vl)
     row["VL prévisionnelle (€)"] = format_fr_euro(vl)
 
@@ -164,8 +168,10 @@ ax.plot(
 
 # Annotations de chaque point
 for i, txt in enumerate(vl_semestres):
+    # S'assurer que chaque valeur est arrondie à 2 décimales
+    txt_arrondi = round(txt, 2)
     ax.annotate(
-        format_fr_euro(txt),
+        format_fr_euro(txt_arrondi),
         (dates_semestres[i], vl_semestres[i]),
         textcoords="offset points",
         xytext=(0, 10),
@@ -191,7 +197,7 @@ ax.set_xticklabels(
 ax.tick_params(axis='y', labelcolor=couleur_bleue)
 
 ax.yaxis.set_major_formatter(
-    ticker.FuncFormatter(lambda x, _: f"{x:,.2f} €".replace(",", " ").replace(".", ","))
+    ticker.FuncFormatter(lambda x, _: f"{round(x, 2):,.2f} €".replace(",", " ").replace(".", ","))
 )
 
 # Fond
