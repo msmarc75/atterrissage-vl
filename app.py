@@ -87,7 +87,7 @@ while datetime(y, 12, 31) <= date_fin_fonds:
 
 # === SIDEBAR : IMPACTS RÉCURRENTS ===
 with st.sidebar.expander("🔁 Impacts récurrents (même chaque semestre)", expanded=expand_all):
-impacts_recurrents = []
+    impacts_recurrents = []
 nb_impacts_rec = st.sidebar.number_input("Nombre d'impacts récurrents", min_value=0, value=len(params['impacts_recurrents']), step=1)
 for i in range(nb_impacts_rec):
     libelle_defaut, montant_defaut = params['impacts_recurrents'][i] if i < len(params['impacts_recurrents']) else (f"Impact récurrent {i+1}", 0.0)
