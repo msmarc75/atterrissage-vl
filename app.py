@@ -67,7 +67,8 @@ if submitted:
 # Exécution seulement si le formulaire est validé
 if submitted:
     # === DATES SEMESTRES ===
-    date_vl_connue = datetime.strptime(date_vl_connue_str, "%d/%m/%Y")
+    datetime(y, 12, 31))
+        y += 1
 date_fin_fonds = datetime.strptime(date_fin_fonds_str, "%d/%m/%Y")
 dates_semestres = [date_vl_connue]
 y = date_vl_connue.year
