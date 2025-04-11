@@ -176,7 +176,7 @@ ax.spines['right'].set_visible(False)
 ax.spines['top'].set_visible(False)
 st.pyplot(fig)
 
-# === PLACEHOLDER BOUTON PDF ===
+# === BOUTON EXPORT EXCEL UNIQUEMENT ===
 col1, col2 = st.columns(2)
 with col1:
     st.download_button(
@@ -185,5 +185,3 @@ with col1:
         file_name="projection_vl.xlsx",
         mime="application/vnd.ms-excel"
     )
-with col2:
-    st.write("Export PDF désactivé.")
