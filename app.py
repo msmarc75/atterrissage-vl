@@ -18,6 +18,7 @@ def init_db():
         CREATE TABLE IF NOT EXISTS simulations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             nom_fonds TEXT NOT NULL,
+            nom_scenario TEXT DEFAULT 'Base case',
             date_vl_connue TEXT NOT NULL,
             date_fin_fonds TEXT NOT NULL,
             anr_derniere_vl REAL NOT NULL,
@@ -104,14 +105,18 @@ def sauvegarder_simulation(params, commentaire=""):
             anr = 10000000.0
             parts = 10000.0
         
+        # Récupérer le nom du scénario, utiliser "Base case" par défaut
+        nom_scenario = params.get('nom_scenario', 'Base case')
+        
         # Insérer les paramètres généraux
         c.execute('''
         INSERT INTO simulations (
-            nom_fonds, date_vl_connue, date_fin_fonds, 
+            nom_fonds, nom_scenario, date_vl_connue, date_fin_fonds, 
             anr_derniere_vl, nombre_parts, date_creation, commentaire
-        ) VALUES (?, ?, ?, ?, ?, ?, ?)
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
-            params['nom_fonds'], 
+            params['nom_fonds'],
+            nom_scenario, 
             params['date_vl_connue'], 
             params['date_fin_fonds'],
             anr, 
@@ -215,6 +220,7 @@ def charger_simulation(simulation_id):
     # Structure pour stocker les paramètres complets
     params = {
         'nom_fonds': sim['nom_fonds'],
+        'nom_scenario': sim.get('nom_scenario', 'Base case'),  # Récupérer le nom du scénario
         'date_vl_connue': sim['date_vl_connue'],
         'date_fin_fonds': sim['date_fin_fonds'],
         'anr_derniere_vl': float(sim['anr_derniere_vl']),  # Assurer que c'est un float
@@ -290,10 +296,23 @@ def lister_simulations():
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     
-    c.execute("""
-    SELECT id, nom_fonds, date_vl_connue, date_creation, commentaire 
-    FROM simulations ORDER BY date_creation DESC
-    """)
+    # Vérifier si la colonne nom_scenario existe déjà dans la table
+    c.execute("PRAGMA table_info(simulations)")
+    colonnes = c.fetchall()
+    colonnes_noms = [col['name'] for col in colonnes]
+    
+    if 'nom_scenario' in colonnes_noms:
+        # Si la colonne existe, on l'inclut dans la requête
+        c.execute("""
+        SELECT id, nom_fonds, nom_scenario, date_vl_connue, date_creation, commentaire 
+        FROM simulations ORDER BY date_creation DESC
+        """)
+    else:
+        # Si la colonne n'existe pas encore, on ne la sélectionne pas
+        c.execute("""
+        SELECT id, nom_fonds, date_vl_connue, date_creation, commentaire 
+        FROM simulations ORDER BY date_creation DESC
+        """)
     
     simulations = [dict(row) for row in c.fetchall()]
     conn.close()
@@ -346,6 +365,7 @@ def champ_numerique(label, valeur):
 # === PARAMÈTRES INITIAUX ===
 default_params = {
     "nom_fonds": "Nom du Fonds",
+    "nom_scenario": "Base case",
     "date_vl_connue": "31/12/2024",
     "date_fin_fonds": "31/12/2028",
     "anr_derniere_vl": 10_000_000.0,
@@ -382,11 +402,11 @@ st.sidebar.header("Gestion des simulations en BDD")
 
 # Option pour sauvegarder la simulation actuelle
 with st.sidebar.expander("💾 Sauvegarder la simulation actuelle"):
-    nom_scenario = st.text_input("Nom du scénario", "")
     if st.button("Sauvegarder dans la BDD"):
         # Préparer les données à sauvegarder
         export_data = {
             "nom_fonds": nom_fonds if 'nom_fonds' in locals() else params['nom_fonds'],
+            "nom_scenario": nom_scenario if 'nom_scenario' in locals() else params.get('nom_scenario', 'Base case'),
             "date_vl_connue": date_vl_connue_str if 'date_vl_connue_str' in locals() else params['date_vl_connue'],
             "date_fin_fonds": date_fin_fonds_str if 'date_fin_fonds_str' in locals() else params['date_fin_fonds'],
             "anr_derniere_vl": anr_derniere_vl if 'anr_derniere_vl' in locals() else params['anr_derniere_vl'],
@@ -437,6 +457,7 @@ with st.sidebar.expander("📂 Charger une simulation"):
 
 # === SAISIE UTILISATEUR ===
 nom_fonds = st.sidebar.text_input("Nom du fonds", params['nom_fonds'])
+nom_scenario = st.sidebar.text_input("Nom du scénario", params.get('nom_scenario', 'Base case'))
 date_vl_connue_str = st.sidebar.text_input("Date dernière VL connue (jj/mm/aaaa)", params['date_vl_connue'])
 date_fin_fonds_str = st.sidebar.text_input("Date fin de fonds (jj/mm/aaaa)", params['date_fin_fonds'])
 anr_derniere_vl = champ_numerique("ANR dernière VL connue (€)", params['anr_derniere_vl'])
@@ -1036,6 +1057,7 @@ st.download_button(
 if st.sidebar.button("📤 Exporter les paramètres JSON"):
     export_data = {
         "nom_fonds": nom_fonds,
+        "nom_scenario": nom_scenario,
         "date_vl_connue": date_vl_connue_str,
         "date_fin_fonds": date_fin_fonds_str,
         "anr_derniere_vl": anr_derniere_vl,
@@ -1045,7 +1067,7 @@ if st.sidebar.button("📤 Exporter les paramètres JSON"):
         "actifs": actifs
     }
     date_aujourd_hui = datetime.now().strftime("%Y%m%d")
-    nom_fichier_json = f"{date_aujourd_hui} - Atterrissage VL - {nom_fonds}.json"
+    nom_fichier_json = f"{date_aujourd_hui} - {nom_fonds} - {nom_scenario}.json"
     json_export = json.dumps(export_data, indent=2).encode('utf-8')
     st.sidebar.download_button("Télécharger paramètres JSON", json_export, file_name=nom_fichier_json)
 
