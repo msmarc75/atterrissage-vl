@@ -85,32 +85,6 @@ with st.sidebar.expander("🔁 Impacts récurrents (même chaque semestre)", exp
         libelle = st.text_input(f"Libellé impact récurrent {i+1}", libelle_defaut)
         montant_str = st.text_input(f"Montant impact récurrent {i+1} (€)", f"{montant_defaut:,.2f}")
         try:
-            montant = float(montant_str.replace(" ", "").replace(",", ".").replace("€", "") or 0)
-        except ValueError:
-            montant = 0.0
-                        .replace(" ", "").replace(",", ".").replace("€", "") or 0)
-        impacts_recurrents.append((libelle, montant))
-
-st.sidebar.markdown("---")
-
-# === SIDEBAR : IMPACTS SPÉCIFIQUES ===
-with st.sidebar.expander("📅 Impacts spécifiques (montants par semestre)", expanded=False):
-    impacts_specifiques = []
-    nb_impacts_spec = st.number_input("Nombre d'impacts spécifiques", min_value=0, value=len(params['impacts_specifiques']), step=1)
-    for i in range(nb_impacts_spec):
-        if i < len(params['impacts_specifiques']):
-            imp = params['impacts_specifiques'][i]
-            libelle_defaut = imp['libelle']
-            montants_defaut = imp['montants']
-        else:
-            libelle_defaut, montants_defaut = f"Impact spécifique {i+1}", {}
-        libelle = st.text_input(f"Libellé impact spécifique {i+1}", libelle_defaut)
-        montants_par_semestre = {}
-        for d in dates_semestres[1:]:
-            key = d.strftime('%d/%m/%Y')
-            val_def = montants_defaut.get(key, 0.0)
-            montant_str = st.text_input(f"{libelle} ({key})", f"{val_def:,.2f}")
-            try:
                 montant = float(montant_str.replace(" ", "").replace(",", ".").replace("€", "") or 0)
             except ValueError:
                 montant = 0.0
