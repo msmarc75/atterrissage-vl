@@ -45,7 +45,24 @@ if 'impacts_recurrents' not in params:
 if 'impacts_specifiques' not in params:
     params['impacts_specifiques'] = []
 
-# === ENTRÉES UTILISATEUR ===
+# === FORMULAIRE GLOBAL ===
+with st.sidebar.form("param_form"):
+    st.markdown("### 📋 Paramètres du fonds")
+    expand_all = st.checkbox("🧩 Tout déplier", value=False)
+
+    nom_fonds = st.text_input("Nom du fonds", params['nom_fonds'])
+    date_vl_connue_str = st.text_input("Date dernière VL connue (jj/mm/aaaa)", params['date_vl_connue'])
+    date_fin_fonds_str = st.text_input("Date fin de fonds (jj/mm/aaaa)", params['date_fin_fonds'])
+
+    anr_derniere_vl = float(str(st.text_input("ANR dernière VL connue (€)", f"{params['anr_derniere_vl']:,.2f}"))
+        .replace(" ", "").replace(",", ".").replace("€", "") or 0)
+    nombre_parts = float(str(st.text_input("Nombre de parts", f"{params['nombre_parts']:,.2f}"))
+        .replace(" ", "").replace(",", ".") or 0)
+
+    submitted = st.form_submit_button("🧮 Calculer la projection")
+
+# Exécution seulement si le formulaire est validé
+if submitted:
 nom_fonds = st.sidebar.text_input("Nom du fonds", params['nom_fonds'])
 date_vl_connue_str = st.sidebar.text_input("Date dernière VL connue (jj/mm/aaaa)", params['date_vl_connue'])
 date_fin_fonds_str = st.sidebar.text_input("Date fin de fonds (jj/mm/aaaa)", params['date_fin_fonds'])
@@ -68,6 +85,7 @@ while datetime(y, 12, 31) <= date_fin_fonds:
     y += 1
 
 # === SIDEBAR : IMPACTS RÉCURRENTS ===
+with st.sidebar.expander("🔁 Impacts récurrents (même chaque semestre)", expanded=expand_all):
 st.sidebar.header("Impacts récurrents")
 impacts_recurrents = []
 nb_impacts_rec = st.sidebar.number_input("Nombre d'impacts récurrents", min_value=0, value=len(params['impacts_recurrents']), step=1)
@@ -81,45 +99,45 @@ for i in range(nb_impacts_rec):
 st.sidebar.markdown("---")
 
 # === SIDEBAR : IMPACTS SPÉCIFIQUES ===
-st.sidebar.header("Impacts spécifiques (par semestre)")
-impacts_specifiques = []
-nb_impacts_spec = st.sidebar.number_input("Nombre d'impacts spécifiques", min_value=0, value=len(params['impacts_specifiques']), step=1)
-for i in range(nb_impacts_spec):
-    if i < len(params['impacts_specifiques']):
-        imp = params['impacts_specifiques'][i]
-        libelle_defaut = imp['libelle']
-        montants_defaut = imp['montants']
-    else:
-        libelle_defaut, montants_defaut = f"Impact spécifique {i+1}", {}
-    libelle = st.sidebar.text_input(f"Libellé impact spécifique {i+1}", libelle_defaut)
-    montants_par_semestre = {}
-    for d in dates_semestres[1:]:
-        key = d.strftime('%d/%m/%Y')
-        val_def = montants_defaut.get(key, 0.0)
-        montant = float(str(st.sidebar.text_input(f"{libelle} ({key})", f"{val_def:,.2f}"))
-                        .replace(" ", "").replace(",", ".").replace("€", "") or 0)
-        montants_par_semestre[key] = montant
-    impacts_specifiques.append({"libelle": libelle, "montants": montants_par_semestre})
+with st.sidebar.expander("📅 Impacts spécifiques (montants par semestre)", expanded=False):
+    impacts_specifiques = []
+    nb_impacts_spec = st.number_input("Nombre d'impacts spécifiques", min_value=0, value=len(params['impacts_specifiques']), step=1)
+    for i in range(nb_impacts_spec):
+        if i < len(params['impacts_specifiques']):
+            imp = params['impacts_specifiques'][i]
+            libelle_defaut = imp['libelle']
+            montants_defaut = imp['montants']
+        else:
+            libelle_defaut, montants_defaut = f"Impact spécifique {i+1}", {}
+        libelle = st.text_input(f"Libellé impact spécifique {i+1}", libelle_defaut)
+        montants_par_semestre = {}
+        for d in dates_semestres[1:]:
+            key = d.strftime('%d/%m/%Y')
+            val_def = montants_defaut.get(key, 0.0)
+            montant = float(str(st.text_input(f"{libelle} ({key})", f"{val_def:,.2f}"))
+                            .replace(" ", "").replace(",", ".").replace("€", "") or 0)
+            montants_par_semestre[key] = montant
+        impacts_specifiques.append({"libelle": libelle, "montants": montants_par_semestre})
 
 # === ACTIFS ===
-st.sidebar.header("Ajouter des Actifs")
-actifs = []
-nb_actifs = st.sidebar.number_input("Nombre d'actifs à ajouter", min_value=1, value=max(1, len(params['actifs'])), step=1)
-for i in range(nb_actifs):
-    a = params['actifs'][i] if i < len(params['actifs']) else {}
-    nom = st.sidebar.text_input(f"Nom Actif {i+1}", a.get('nom', f"Actif {i+1}"))
-    pct = st.sidebar.slider(f"% Détention Actif {i+1}", 0.0, 100.0, float(a.get('pct_detention', 1.0) * 100), 1.0)
-    val_actuelle = float(str(st.sidebar.text_input(f"Valeur actuelle Actif {i+1} (€)", f"{a.get('valeur_actuelle', 1000000):,.2f}"))
+with st.sidebar.expander("🏢 Actifs du portefeuille", expanded=False):
+    actifs = []
+    nb_actifs = st.number_input("Nombre d'actifs à ajouter", min_value=1, value=max(1, len(params['actifs'])), step=1)
+    for i in range(nb_actifs):
+        a = params['actifs'][i] if i < len(params['actifs']) else {}
+        nom = st.text_input(f"Nom Actif {i+1}", a.get('nom', f"Actif {i+1}"))
+        pct = st.slider(f"% Détention Actif {i+1}", 0.0, 100.0, float(a.get('pct_detention', 1.0) * 100), 1.0)
+        val_actuelle = float(str(st.text_input(f"Valeur actuelle Actif {i+1} (€)", f"{a.get('valeur_actuelle', 1000000):,.2f}"))
+                             .replace(" ", "").replace(",", ".").replace("€", "") or 0)
+        val_proj = float(str(st.text_input(f"Valeur projetée S+1 Actif {i+1} (€)", f"{a.get('valeur_projetee', val_actuelle + 50000):,.2f}"))
                          .replace(" ", "").replace(",", ".").replace("€", "") or 0)
-    val_proj = float(str(st.sidebar.text_input(f"Valeur projetée S+1 Actif {i+1} (€)", f"{a.get('valeur_projetee', val_actuelle + 50000):,.2f}"))
-                     .replace(" ", "").replace(",", ".").replace("€", "") or 0)
-    actifs.append({
-        "nom": nom,
-        "pct_detention": pct / 100,
-        "valeur_actuelle": val_actuelle,
-        "valeur_projetee": val_proj,
-        "variation": (val_proj - val_actuelle) * (pct / 100)
-    })
+        actifs.append({
+            "nom": nom,
+            "pct_detention": pct / 100,
+            "valeur_actuelle": val_actuelle,
+            "valeur_projetee": val_proj,
+            "variation": (val_proj - val_actuelle) * (pct / 100)
+        })
 
 # === PROJECTION ===
 anr_courant = anr_derniere_vl
@@ -150,21 +168,23 @@ projection = pd.DataFrame(projection_rows)
 st.dataframe(projection)
 
 # === EXPORT PARAMÈTRES JSON ===
-if st.sidebar.button("📤 Exporter les paramètres JSON"):
-    export_data = {
-        "nom_fonds": nom_fonds,
-        "date_vl_connue": date_vl_connue_str,
-        "date_fin_fonds": date_fin_fonds_str,
-        "anr_derniere_vl": anr_derniere_vl,
-        "nombre_parts": nombre_parts,
-        "impacts_recurrents": impacts_recurrents,
-        "impacts_specifiques": impacts_specifiques,
-        "actifs": actifs
-    }
-    json_export = json.dumps(export_data, indent=2).encode('utf-8')
-    st.sidebar.download_button("Télécharger paramètres JSON", json_export, file_name="parametres_vl.json")
+if submitted:
+    if st.sidebar.button("📤 Exporter les paramètres JSON"):
+        export_data = {
+            "nom_fonds": nom_fonds,
+            "date_vl_connue": date_vl_connue_str,
+            "date_fin_fonds": date_fin_fonds_str,
+            "anr_derniere_vl": anr_derniere_vl,
+            "nombre_parts": nombre_parts,
+            "impacts_recurrents": impacts_recurrents,
+            "impacts_specifiques": impacts_specifiques,
+            "actifs": actifs
+        }
+        json_export = json.dumps(export_data, indent=2).encode('utf-8')
+        st.sidebar.download_button("Télécharger paramètres JSON", json_export, file_name="parametres_vl.json")
 
 # === EXPORT PDF ET EXCEL ===
+if submitted:
 
 col1, col2 = st.columns(2)
 
