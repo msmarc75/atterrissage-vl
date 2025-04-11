@@ -18,14 +18,6 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-st.markdown("""
-    <style>
-        .block-container { padding: 2rem; }
-        .stDownloadButton button { background-color: #0000DC; color: white; font-weight: bold; }
-        .stButton button { background-color: #f0f2f6; font-weight: bold; }
-    </style>
-""", unsafe_allow_html=True)
-
 st.title("📊 Atterrissage VL Professionnel")
 
 onglets = st.tabs(["⚙️ Paramètres", "📈 Projection & Graphique", "📤 Export"])
@@ -102,13 +94,11 @@ try:
 
     projection = pd.DataFrame(projection_rows)
 
-    # Corriger les formats : convertir les colonnes numériques
     for col in projection.columns:
         if col != "Date":
             projection[col] = pd.to_numeric(projection[col], errors="coerce")
 
-
-with onglets[1]:
+    with onglets[1]:
         st.header("Projection de la VL")
         st.dataframe(projection.style.format("{:.2f}"))
 
@@ -135,13 +125,11 @@ with onglets[1]:
     with onglets[2]:
         st.header("Export des résultats")
 
-        # Excel
         buffer = io.BytesIO()
         projection.to_excel(buffer, index=False)
         buffer.seek(0)
         st.download_button("📥 Télécharger Excel", buffer, file_name="projection_vl.xlsx")
 
-        # PDF
         def generate_pdf():
             buffer = io.BytesIO()
             doc = SimpleDocTemplate(buffer, pagesize=A4)
@@ -168,12 +156,13 @@ with onglets[1]:
             elements.append(Spacer(1, 24))
 
             fig, ax = plt.subplots(figsize=(6, 3))
-            ax.plot(dates_semestres, vl_semestres, marker='o', linewidth=2.5, color="#0000DC")
+            couleur_bleue = "#0000DC"
+            ax.plot(dates_semestres, vl_semestres, marker='o', linewidth=2.5, color=couleur_bleue)
             for i, txt in enumerate(vl_semestres):
                 ax.annotate(f"{txt:,.2f} €".replace(",", " ").replace(".", ","),
                             (dates_semestres[i], vl_semestres[i]),
                             textcoords="offset points", xytext=(0, 10), ha='center', fontsize=8,
-                            bbox=dict(boxstyle="round,pad=0.3", fc="#0000DC", ec="#0000DC", alpha=0.9), color='white')
+                            bbox=dict(boxstyle="round,pad=0.3", fc=couleur_bleue, ec=couleur_bleue, alpha=0.9), color='white')
             ax.set_title("Projection de la VL", fontsize=12)
             ax.set_ylabel("VL (€)")
             ax.set_xticks(dates_semestres)
@@ -183,20 +172,27 @@ with onglets[1]:
             ax.set_facecolor('white')
             ax.spines['right'].set_visible(False)
             ax.spines['top'].set_visible(False)
+
             img_buffer = io.BytesIO()
             plt.tight_layout()
             plt.savefig(img_buffer, format='png')
             plt.close(fig)
             img_buffer.seek(0)
 
-            elements.append(Image(img_buffer, width=400, height=200))
+            img = Image(img_buffer, width=400, height=200)
+            elements.append(img)
+
             doc.build(elements)
             buffer.seek(0)
             return buffer
 
-        st.download_button("📄 Exporter en PDF", data=generate_pdf(), file_name="projection_vl.pdf", mime="application/pdf")
+        st.download_button(
+            label="📄 Exporter en PDF",
+            data=generate_pdf(),
+            file_name="projection_vl.pdf",
+            mime="application/pdf"
+        )
 
-        # JSON paramètres
         export_data = {
             "nom_fonds": nom_fonds,
             "date_vl_connue": date_vl_connue_str,
@@ -206,7 +202,8 @@ with onglets[1]:
             "impacts": impacts,
             "actifs": actifs
         }
-        st.download_button("📦 Exporter les paramètres JSON", data=json.dumps(export_data, indent=2).encode('utf-8'), file_name="parametres_vl.json")
+        json_export = json.dumps(export_data, indent=2).encode('utf-8')
+        st.download_button("📦 Exporter les paramètres JSON", data=json_export, file_name="parametres_vl.json")
 
 except Exception as e:
     st.warning(f"Veuillez vérifier les champs de date ou d'entrée : {e}")
