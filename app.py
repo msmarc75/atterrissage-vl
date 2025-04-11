@@ -28,8 +28,14 @@ default_params = {
     "impacts": [
         ("Frais corporate", -50_000.0)
     ],
-    "impacts_ponctuels": [
-        {"libelle": "Honoraires NIV", "montant": -30_000.0, "date": "30/06/2025"}
+    "impacts_multidates": [
+        {
+            "libelle": "Honoraires NIV",
+            "montants": [
+                {"date": "30/06/2025", "montant": -30_000.0},
+                {"date": "31/12/2025", "montant": -15_000.0}
+            ]
+        }
     ],
     "actifs": []
 }
@@ -66,6 +72,9 @@ while datetime(y, 12, 31) <= date_fin_fonds:
         dates_semestres.append(datetime(y, 12, 31))
     y += 1
 
+# Création de la liste des dates formatées pour le selectbox
+dates_semestres_str = [d.strftime("%d/%m/%Y") for d in dates_semestres]
+
 # Impacts personnalisés récurrents
 st.sidebar.header("Impacts semestriels récurrents")
 impacts = []
@@ -79,42 +88,69 @@ for i in range(nb_impacts):
     montant = champ_numerique(f"Montant semestriel impact récurrent {i+1} (€)", montant_defaut)
     impacts.append((libelle, montant))
 
-# Impacts ponctuels sur date spécifique
-st.sidebar.header("Impacts ponctuels")
-impacts_ponctuels = []
-nb_impacts_ponctuels = st.sidebar.number_input("Nombre d'impacts ponctuels", min_value=0, 
-                                             value=len(params.get('impacts_ponctuels', [])), step=1)
+# Impacts multidates (à plusieurs dates différentes)
+st.sidebar.header("Impacts multidates")
+impacts_multidates = []
+nb_impacts_multidates = st.sidebar.number_input("Nombre d'impacts multidates", min_value=0, 
+                                             value=len(params.get('impacts_multidates', [])), step=1)
 
-# Création de la liste des dates formatées pour le selectbox
-dates_semestres_str = [d.strftime("%d/%m/%Y") for d in dates_semestres]
-
-for i in range(nb_impacts_ponctuels):
-    st.sidebar.subheader(f"Impact ponctuel {i+1}")
+for i in range(nb_impacts_multidates):
+    st.sidebar.subheader(f"Impact multidate {i+1}")
     
-    if i < len(params.get('impacts_ponctuels', [])):
-        impact_default = params['impacts_ponctuels'][i]
+    # Récupération des paramètres par défaut s'ils existent
+    if i < len(params.get('impacts_multidates', [])):
+        impact_default = params['impacts_multidates'][i]
         libelle_defaut = impact_default['libelle']
-        montant_defaut = impact_default['montant']
-        date_defaut = impact_default['date']
-        # Trouver l'index de la date par défaut dans la liste des dates formatées
-        date_index = dates_semestres_str.index(date_defaut) if date_defaut in dates_semestres_str else 0
+        montants_defaut = impact_default['montants']
     else:
-        libelle_defaut = f"Impact ponctuel {i+1}"
-        montant_defaut = 0.0
-        date_index = 0
+        libelle_defaut = f"Impact multidate {i+1}"
+        montants_defaut = []
     
-    libelle = st.sidebar.text_input(f"Libellé impact ponctuel {i+1}", libelle_defaut)
-    montant = champ_numerique(f"Montant impact ponctuel {i+1} (€)", montant_defaut)
-    date_str = st.sidebar.selectbox(
-        f"Date impact ponctuel {i+1}",
-        options=dates_semestres_str,
-        index=date_index
+    # Libellé de l'impact multidate
+    libelle = st.sidebar.text_input(f"Libellé impact multidate {i+1}", libelle_defaut)
+    
+    # Nombre d'occurrences pour cet impact
+    nb_occurrences = st.sidebar.number_input(
+        f"Nombre d'occurrences pour '{libelle}'", 
+        min_value=0, 
+        value=len(montants_defaut), 
+        step=1
     )
     
-    impacts_ponctuels.append({
+    # Liste pour stocker les montants et dates de cet impact
+    montants = []
+    
+    # Interface pour chaque occurrence
+    for j in range(nb_occurrences):
+        st.sidebar.markdown(f"##### Occurrence {j+1} de '{libelle}'")
+        
+        # Valeurs par défaut pour cette occurrence
+        if j < len(montants_defaut):
+            montant_defaut = montants_defaut[j]['montant']
+            date_defaut = montants_defaut[j]['date']
+            date_index = dates_semestres_str.index(date_defaut) if date_defaut in dates_semestres_str else 0
+        else:
+            montant_defaut = 0.0
+            date_index = 0
+        
+        # Champ pour le montant
+        montant = champ_numerique(f"Montant {j+1} de '{libelle}' (€)", montant_defaut)
+        
+        # Selectbox pour la date
+        date_str = st.sidebar.selectbox(
+            f"Date {j+1} de '{libelle}'",
+            options=dates_semestres_str,
+            index=date_index
+        )
+        
+        montants.append({
+            "date": date_str,
+            "montant": montant
+        })
+    
+    impacts_multidates.append({
         "libelle": libelle,
-        "montant": montant,
-        "date": date_str
+        "montants": montants
     })
 
 # Actifs
@@ -173,19 +209,28 @@ for i, date in enumerate(dates_semestres):
         else:
             row[f"Impact récurrent - {libelle}"] = format_fr_euro(0)
 
-    # Impacts ponctuels pour cette date spécifique
-    total_impacts_ponctuels = 0
-    for impact in impacts_ponctuels:
-        if impact['date'] == date_str:
-            row[f"Impact ponctuel - {impact['libelle']}"] = format_fr_euro(impact['montant'])
-            total_impacts_ponctuels += impact['montant']
-        else:
-            row[f"Impact ponctuel - {impact['libelle']}"] = format_fr_euro(0)
+    # Impacts multidates pour cette date spécifique
+    total_impacts_multidates = 0
+    for impact in impacts_multidates:
+        libelle = impact['libelle']
+        # Initialiser la valeur à 0 par défaut
+        impact_valeur = 0
+        
+        # Parcourir toutes les occurrences de cet impact
+        for occurrence in impact['montants']:
+            if occurrence['date'] == date_str:
+                impact_valeur += occurrence['montant']
+        
+        # Ajouter au total
+        total_impacts_multidates += impact_valeur
+        
+        # Afficher dans le tableau
+        row[f"Impact multidate - {libelle}"] = format_fr_euro(impact_valeur)
 
     if i > 0:
         anr_courant += total_var_actifs + total_impacts_recurrents
-    # Toujours appliquer les impacts ponctuels, même à S+0
-    anr_courant += total_impacts_ponctuels
+    # Appliquer les impacts multidates
+    anr_courant += total_impacts_multidates
 
     vl = anr_courant / nombre_parts
     # Arrondir à deux décimales
@@ -523,7 +568,7 @@ if st.sidebar.button("📤 Exporter les paramètres JSON"):
         "anr_derniere_vl": anr_derniere_vl,
         "nombre_parts": nombre_parts,
         "impacts": impacts,
-        "impacts_ponctuels": impacts_ponctuels,
+        "impacts_multidates": impacts_multidates,
         "actifs": actifs
     }
     date_aujourd_hui = datetime.now().strftime("%Y%m%d")
