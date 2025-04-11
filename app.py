@@ -469,18 +469,34 @@ with st.sidebar.expander("💾 Sauvegarder la simulation"):
     
     if mode_sauvegarde == "Nouvelle sauvegarde":
         if st.button("Sauvegarder comme nouvelle simulation"):
-            # Préparer les données à sauvegarder
+            # Préparer les données à sauvegarder avec une vérification sécurisée de toutes les variables
             export_data = {
                 "nom_fonds": current_nom_fonds,
                 "nom_scenario": current_nom_scenario,
-                "date_vl_connue": date_vl_connue_str,
-                "date_fin_fonds": date_fin_fonds_str,
-                "anr_derniere_vl": anr_derniere_vl,
-                "nombre_parts": nombre_parts,
-                "impacts": impacts,
-                "impacts_multidates": impacts_multidates,
-                "actifs": actifs
+                "date_vl_connue": params.get('date_vl_connue', "31/12/2024"),
+                "date_fin_fonds": params.get('date_fin_fonds', "31/12/2028"),
+                "anr_derniere_vl": params.get('anr_derniere_vl', 10_000_000.0),
+                "nombre_parts": params.get('nombre_parts', 10_000.0),
+                "impacts": params.get('impacts', []),
+                "impacts_multidates": params.get('impacts_multidates', []),
+                "actifs": params.get('actifs', [])
             }
+            
+            # Utiliser les variables locales si elles existent
+            if 'date_vl_connue_str' in locals() and date_vl_connue_str:
+                export_data["date_vl_connue"] = date_vl_connue_str
+            if 'date_fin_fonds_str' in locals() and date_fin_fonds_str:
+                export_data["date_fin_fonds"] = date_fin_fonds_str
+            if 'anr_derniere_vl' in locals() and anr_derniere_vl:
+                export_data["anr_derniere_vl"] = anr_derniere_vl
+            if 'nombre_parts' in locals() and nombre_parts:
+                export_data["nombre_parts"] = nombre_parts
+            if 'impacts' in locals() and impacts:
+                export_data["impacts"] = impacts
+            if 'impacts_multidates' in locals() and impacts_multidates:
+                export_data["impacts_multidates"] = impacts_multidates
+            if 'actifs' in locals() and actifs:
+                export_data["actifs"] = actifs
             
             # Date au format jour/mois/année
             date_formatee = datetime.now().strftime("%d/%m/%Y")
@@ -523,18 +539,34 @@ with st.sidebar.expander("💾 Sauvegarder la simulation"):
             if st.button("Mettre à jour la simulation"):
                 simulation_id = options[sim_a_mettre_a_jour]
                 
-                # Préparer les données à sauvegarder
+                # Préparer les données à sauvegarder avec une vérification sécurisée de toutes les variables
                 export_data = {
                     "nom_fonds": current_nom_fonds,
                     "nom_scenario": current_nom_scenario,
-                    "date_vl_connue": date_vl_connue_str,
-                    "date_fin_fonds": date_fin_fonds_str,
-                    "anr_derniere_vl": anr_derniere_vl,
-                    "nombre_parts": nombre_parts,
-                    "impacts": impacts,
-                    "impacts_multidates": impacts_multidates,
-                    "actifs": actifs
+                    "date_vl_connue": params.get('date_vl_connue', "31/12/2024"),
+                    "date_fin_fonds": params.get('date_fin_fonds', "31/12/2028"),
+                    "anr_derniere_vl": params.get('anr_derniere_vl', 10_000_000.0),
+                    "nombre_parts": params.get('nombre_parts', 10_000.0),
+                    "impacts": params.get('impacts', []),
+                    "impacts_multidates": params.get('impacts_multidates', []),
+                    "actifs": params.get('actifs', [])
                 }
+                
+                # Utiliser les variables locales si elles existent
+                if 'date_vl_connue_str' in locals() and date_vl_connue_str:
+                    export_data["date_vl_connue"] = date_vl_connue_str
+                if 'date_fin_fonds_str' in locals() and date_fin_fonds_str:
+                    export_data["date_fin_fonds"] = date_fin_fonds_str
+                if 'anr_derniere_vl' in locals() and anr_derniere_vl:
+                    export_data["anr_derniere_vl"] = anr_derniere_vl
+                if 'nombre_parts' in locals() and nombre_parts:
+                    export_data["nombre_parts"] = nombre_parts
+                if 'impacts' in locals() and impacts:
+                    export_data["impacts"] = impacts
+                if 'impacts_multidates' in locals() and impacts_multidates:
+                    export_data["impacts_multidates"] = impacts_multidates
+                if 'actifs' in locals() and actifs:
+                    export_data["actifs"] = actifs
                 
                 # Supprimer l'ancienne simulation
                 supprimer_simulation(simulation_id)
