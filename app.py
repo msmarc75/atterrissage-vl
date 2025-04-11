@@ -6,10 +6,17 @@ from datetime import datetime, timedelta
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import io
+import os
 
 # === INITIALISATION DE LA BASE DE DONNÉES ===
 def init_db():
     try:
+        # Vérifier si le fichier de base de données existe et s'il a une taille nulle
+        db_file = 'simulations_fonds.db'
+        if os.path.exists(db_file) and os.path.getsize(db_file) == 0:
+            print("DEBUG: Fichier de BDD corrompu ou vide, suppression")
+            os.remove(db_file)
+            
         conn = sqlite3.connect('simulations_fonds.db')
         c = conn.cursor()
         
@@ -39,17 +46,6 @@ def init_db():
             ADD COLUMN nom_scenario TEXT DEFAULT 'Base case'
             ''')
             print("Colonne nom_scenario ajoutée à la table simulations")
-        
-        # Table pour les impacts récurrents
-        c.execute('''
-        CREATE TABLE IF NOT EXISTS impacts_recurrents (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            simulation_id INTEGER NOT NULL,
-            libelle TEXT NOT NULL,
-            montant REAL NOT NULL,
-            FOREIGN KEY (simulation_id) REFERENCES simulations (id) ON DELETE CASCADE
-        )
-        ''')
         
         # Table pour les impacts récurrents
         c.execute('''
@@ -116,6 +112,8 @@ def init_db():
 def sauvegarder_simulation(params, commentaire=""):
     try:
         conn = sqlite3.connect('simulations_fonds.db')
+        # Activer les clés étrangères pour cette connexion
+        conn.execute("PRAGMA foreign_keys = ON")
         c = conn.cursor()
         
         # S'assurer que les valeurs numériques sont bien des nombres
@@ -175,6 +173,7 @@ def sauvegarder_simulation(params, commentaire=""):
         
         
         simulation_id = c.lastrowid
+        print(f"DEBUG: Simulation créée avec ID={simulation_id}")
         
         # Insérer les impacts récurrents
         for libelle, montant in params['impacts']:
@@ -237,9 +236,12 @@ def sauvegarder_simulation(params, commentaire=""):
                 bool(actif.get('is_a_provisionner', False))
             ))
         
+        print("DEBUG: Tentative de commit...")
         conn.commit()
+        print("DEBUG: Commit effectué")
         conn.close()
         
+        print(f"DEBUG: Sauvegarde complète de la simulation #{simulation_id}")
         return simulation_id
         
     except Exception as e:
@@ -345,6 +347,16 @@ def lister_simulations():
     conn.row_factory = sqlite3.Row
     c = conn.cursor()
     
+    # Débug - lister toutes les simulations brutes
+    c.execute("SELECT * FROM simulations")
+    all_rows = c.fetchall()
+    print(f"DEBUG - Nombre total de simulations en base: {len(all_rows)}")
+    for row in all_rows:
+        try:
+            print(f"  - ID: {row['id']}, Nom: {row['nom_fonds']}, Scénario: {row.get('nom_scenario', 'N/A')}")
+        except Exception as e:
+            print(f"  - Erreur lecture row: {e}")
+    
     # Vérifier si la colonne nom_scenario existe déjà dans la table
     c.execute("PRAGMA table_info(simulations)")
     colonnes = c.fetchall()
@@ -386,6 +398,7 @@ def lister_simulations():
     conn.close()
     
     # Déboguer - afficher les infos importantes pour chaque simulation
+    print(f"DEBUG - Nombre de simulations traitées: {len(simulations)}")
     for i, sim in enumerate(simulations):
         print(f"Simulation #{i+1}:")
         print(f"  ID: {sim['id']}")
@@ -398,6 +411,8 @@ def lister_simulations():
 
 def supprimer_simulation(simulation_id):
     conn = sqlite3.connect('simulations_fonds.db')
+    # Activer les clés étrangères pour cette connexion
+    conn.execute("PRAGMA foreign_keys = ON")
     c = conn.cursor()
     
     # Supprimer les occurrences d'impacts multidates
@@ -535,7 +550,12 @@ with st.sidebar.expander("💾 Sauvegarder la simulation"):
             
             if simulation_id:
                 st.sidebar.success(f"Nouvelle simulation '{current_nom_scenario}' sauvegardée avec succès")
-                st.rerun()  # Cette ligne force le rechargement de l'application
+                # Forcer un changement dans l'état de session pour déclencher un rechargement
+                if 'refresh_counter' not in st.session_state:
+                    st.session_state.refresh_counter = 0
+                st.session_state.refresh_counter += 1
+                print(f"DEBUG: Rechargement forcé, compteur={st.session_state.refresh_counter}")
+                st.rerun()
             else:
                 st.sidebar.error("Échec de la sauvegarde, veuillez réessayer")
     else:
@@ -608,7 +628,11 @@ with st.sidebar.expander("💾 Sauvegarder la simulation"):
                 
                 if new_id:
                     st.sidebar.success(f"Simulation '{current_nom_scenario}' mise à jour avec succès")
-                    st.rerun()  # Cette ligne force le rechargement de l'application
+                    # Forcer un changement dans l'état de session pour déclencher un rechargement
+                    if 'refresh_counter' not in st.session_state:
+                        st.session_state.refresh_counter = 0
+                    st.session_state.refresh_counter += 1
+                    st.rerun()
                 else:
                     st.sidebar.error("Échec de la mise à jour, veuillez réessayer")
         else:
@@ -634,7 +658,7 @@ with st.sidebar.expander("📂 Charger une simulation"):
                 st.rerun()
         with col2:
             if st.button("🗑️ Supprimer"):
-                simulation_id = options[sim_selectionnee]
+simulation_id = options[sim_selectionnee]
                 supprimer_simulation(simulation_id)
                 st.success("Simulation supprimée avec succès")
                 st.rerun()
@@ -1010,7 +1034,7 @@ with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
         'num_format': '#,##0.00 €',  # Format monétaire sans zéros superflus
         'font_color': 'red',
     })
-    
+
     # Mettre en forme les colonnes monétaires et ajuster les largeurs (avec décalage)
     for idx, col in enumerate(projection.columns):
         # Calculer la largeur optimale (plus précise)
@@ -1227,7 +1251,8 @@ with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
     })
     
     chart.set_y_axis({
-        'name': 'VL (€)',
+        'name':
+        'VL (€)',
         'name_font': {
             'color': couleur_bleue,
             'bold': True
