@@ -216,7 +216,12 @@ with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
     # Exporter les données - nous n'utilisons pas to_excel directement
     # car nous voulons créer une marge d'une ligne et une colonne
     workbook = writer.book
-    worksheet = workbook.add_worksheet('Projection')
+    
+    # Créer un onglet "Atterrissage VL" à la place de "Projection"
+    worksheet = workbook.add_worksheet('Atterrissage VL')
+    
+    # Couleur bleue pour l'onglet
+    worksheet.set_tab_color('#0000DC')
     
     # Formats pour l'Excel
     header_format = workbook.add_format({
