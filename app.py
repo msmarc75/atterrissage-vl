@@ -426,27 +426,32 @@ with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
             for row_num in range(len(projection)):
                 cell_value = projection.iloc[row_num, idx]
                 
-                # Extraire la valeur numérique
-                if isinstance(cell_value, str):
-                    if "€" in cell_value:
-                        # Format standard avec euro
-                        numeric_value = float(cell_value.replace(" ", "").replace("€", "").replace(",", "."))
-                    elif "brut:" in cell_value and "|" in cell_value and "net:" in cell_value:
-                        # Format spécial pour IS: "brut: X XXX,XX € | net: X XXX,XX €"
-                        # Extraire seulement la valeur nette
-                        net_part = cell_value.split("|")[1].strip()
-                        net_value = net_part.replace("net:", "").strip()
-                        numeric_value = float(net_value.replace(" ", "").replace("€", "").replace(",", "."))
-                    else:
-                        try:
+                # SECTION CORRIGÉE: Extraction de la valeur numérique avec gestion d'erreurs
+                try:
+                    if isinstance(cell_value, str):
+                        if "€" in cell_value:
+                            # Format standard avec euro
+                            numeric_value = float(cell_value.replace(" ", "").replace("€", "").replace(",", "."))
+                        elif "brut:" in cell_value and "|" in cell_value and "net:" in cell_value:
+                            # Format spécial pour IS: "brut: X XXX,XX € | net: X XXX,XX €"
+                            # Extraire seulement la valeur nette
+                            net_part = cell_value.split("|")[1].strip()
+                            net_value = net_part.replace("net:", "").strip()
+                            numeric_value = float(net_value.replace(" ", "").replace("€", "").replace(",", "."))
+                        else:
+                            # Autre texte, essayer de convertir directement
                             numeric_value = float(cell_value.replace(",", "."))
-                        except ValueError:
-                            numeric_value = 0
-                else:
-                    try:
+                    elif isinstance(cell_value, (int, float)):
+                        # Déjà un nombre
                         numeric_value = float(cell_value)
-                    except (ValueError, TypeError):
+                    else:
+                        # Si c'est un autre type (None, etc.)
+                        st.warning(f"Type non géré rencontré dans l'export Excel: {type(cell_value)}, valeur: {cell_value}")
                         numeric_value = 0
+                except Exception as e:
+                    # En cas d'erreur, afficher un message de débogage et mettre 0
+                    st.warning(f"Erreur lors de la conversion de la valeur '{cell_value}' (type: {type(cell_value)}): {str(e)}")
+                    numeric_value = 0
                 
                 # Appliquer le format approprié selon si le nombre est négatif ou positif (avec décalage)
                 if numeric_value < 0:
@@ -458,27 +463,32 @@ with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
             for row_num in range(len(projection)):
                 cell_value = projection.iloc[row_num, idx]
                 
-                # Extraire la valeur numérique
-                if isinstance(cell_value, str):
-                    if "€" in cell_value:
-                        # Format standard avec euro
-                        numeric_value = float(cell_value.replace(" ", "").replace("€", "").replace(",", "."))
-                    elif "brut:" in cell_value and "|" in cell_value and "net:" in cell_value:
-                        # Format spécial pour IS: "brut: X XXX,XX € | net: X XXX,XX €"
-                        # Extraire seulement la valeur nette
-                        net_part = cell_value.split("|")[1].strip()
-                        net_value = net_part.replace("net:", "").strip()
-                        numeric_value = float(net_value.replace(" ", "").replace("€", "").replace(",", "."))
-                    else:
-                        try:
+                # SECTION CORRIGÉE: Extraction de la valeur numérique avec gestion d'erreurs
+                try:
+                    if isinstance(cell_value, str):
+                        if "€" in cell_value:
+                            # Format standard avec euro
+                            numeric_value = float(cell_value.replace(" ", "").replace("€", "").replace(",", "."))
+                        elif "brut:" in cell_value and "|" in cell_value and "net:" in cell_value:
+                            # Format spécial pour IS: "brut: X XXX,XX € | net: X XXX,XX €"
+                            # Extraire seulement la valeur nette
+                            net_part = cell_value.split("|")[1].strip()
+                            net_value = net_part.replace("net:", "").strip()
+                            numeric_value = float(net_value.replace(" ", "").replace("€", "").replace(",", "."))
+                        else:
+                            # Autre texte, essayer de convertir directement
                             numeric_value = float(cell_value.replace(",", "."))
-                        except ValueError:
-                            numeric_value = 0
-                else:
-                    try:
+                    elif isinstance(cell_value, (int, float)):
+                        # Déjà un nombre
                         numeric_value = float(cell_value)
-                    except (ValueError, TypeError):
+                    else:
+                        # Si c'est un autre type (None, etc.)
+                        st.warning(f"Type non géré rencontré dans l'export Excel: {type(cell_value)}, valeur: {cell_value}")
                         numeric_value = 0
+                except Exception as e:
+                    # En cas d'erreur, afficher un message de débogage et mettre 0
+                    st.warning(f"Erreur lors de la conversion de la valeur '{cell_value}' (type: {type(cell_value)}): {str(e)}")
+                    numeric_value = 0
                 
                 # Format nombre à deux décimales pour VL
                 if numeric_value < 0:
