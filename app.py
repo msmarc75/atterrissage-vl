@@ -404,9 +404,14 @@ st.sidebar.header("Gestion des simulations en BDD")
 with st.sidebar.expander("💾 Sauvegarder la simulation actuelle"):
     if st.button("Sauvegarder dans la BDD"):
         # Préparer les données à sauvegarder
+        # Récupérer le nom du scénario depuis les variables locales ou les paramètres
+        scenario_nom = params.get('nom_scenario', 'Base case')
+        if 'nom_scenario' in locals():
+            scenario_nom = nom_scenario
+
         export_data = {
             "nom_fonds": nom_fonds if 'nom_fonds' in locals() else params['nom_fonds'],
-            "nom_scenario": nom_scenario if 'nom_scenario' in locals() else params.get('nom_scenario', 'Base case'),
+            "nom_scenario": scenario_nom,
             "date_vl_connue": date_vl_connue_str if 'date_vl_connue_str' in locals() else params['date_vl_connue'],
             "date_fin_fonds": date_fin_fonds_str if 'date_fin_fonds_str' in locals() else params['date_fin_fonds'],
             "anr_derniere_vl": anr_derniere_vl if 'anr_derniere_vl' in locals() else params['anr_derniere_vl'],
@@ -420,11 +425,11 @@ with st.sidebar.expander("💾 Sauvegarder la simulation actuelle"):
         date_formatee = datetime.now().strftime("%d/%m/%Y")
         
         # Sauvegarder dans la BDD avec le commentaire formaté
-        commentaire = f"{nom_scenario} - {date_formatee}"
+        commentaire = f"{scenario_nom} - {date_formatee}"
         simulation_id = sauvegarder_simulation(export_data, commentaire)
         
         if simulation_id:
-            st.sidebar.success(f"Simulation '{nom_scenario}' sauvegardée avec succès")
+            st.sidebar.success(f"Simulation '{scenario_nom}' sauvegardée avec succès")
         else:
             st.sidebar.error("Échec de la sauvegarde, veuillez réessayer")
 
