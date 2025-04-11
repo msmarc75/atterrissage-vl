@@ -102,10 +102,11 @@ try:
 
     projection = pd.DataFrame(projection_rows)
 
-# ✅ Placer ici la conversion juste après avoir créé le DataFrame
-for col in projection.columns:
-    if col != "Date":
-        projection[col] = pd.to_numeric(projection[col], errors="coerce")
+    # Corriger les formats : convertir les colonnes numériques
+    for col in projection.columns:
+        if col != "Date":
+            projection[col] = pd.to_numeric(projection[col], errors="coerce")
+
 
 with onglets[1]:
         st.header("Projection de la VL")
