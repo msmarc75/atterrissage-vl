@@ -172,8 +172,8 @@ for i in range(nb_actifs):
         val_proj = 1_050_000.0
 
     nom_actif = st.sidebar.text_input(f"Nom Actif {i+1}", nom_defaut)
-    # Remplace le slider par un champ de saisie directe du pourcentage
-    pct_text = st.sidebar.text_input(f"% Détention Actif {i+1}", value=f"{pct_defaut:.2f}")
+    # Remplace le slider par un champ de saisie directe du pourcentage au format français
+    pct_text = st.sidebar.text_input(f"% Détention Actif {i+1}", value=f"{pct_defaut:.2f}".replace(".", ","))
     try:
         pct_detention = float(pct_text.replace(",", "."))
     except ValueError:
