@@ -535,6 +535,7 @@ with st.sidebar.expander("💾 Sauvegarder la simulation"):
             
             if simulation_id:
                 st.sidebar.success(f"Nouvelle simulation '{current_nom_scenario}' sauvegardée avec succès")
+                st.rerun()  # Cette ligne force le rechargement de l'application
             else:
                 st.sidebar.error("Échec de la sauvegarde, veuillez réessayer")
     else:
@@ -607,6 +608,7 @@ with st.sidebar.expander("💾 Sauvegarder la simulation"):
                 
                 if new_id:
                     st.sidebar.success(f"Simulation '{current_nom_scenario}' mise à jour avec succès")
+                    st.rerun()  # Cette ligne force le rechargement de l'application
                 else:
                     st.sidebar.error("Échec de la mise à jour, veuillez réessayer")
         else:
