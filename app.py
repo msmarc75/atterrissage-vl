@@ -101,13 +101,13 @@ try:
         projection_rows.append(row)
 
     projection = pd.DataFrame(projection_rows)
-    
-# Convertir toutes les colonnes sauf 'Date' en float (si possible)
+
+# ✅ Placer ici la conversion juste après avoir créé le DataFrame
 for col in projection.columns:
     if col != "Date":
         projection[col] = pd.to_numeric(projection[col], errors="coerce")
 
-    with onglets[1]:
+with onglets[1]:
         st.header("Projection de la VL")
         st.dataframe(projection.style.format("{:.2f}"))
 
