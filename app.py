@@ -432,12 +432,24 @@ with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                         if "€" in cell_value:
                             # Format standard avec euro
                             numeric_value = float(cell_value.replace(" ", "").replace("€", "").replace(",", "."))
-                        elif "brut:" in cell_value and "|" in cell_value and "net:" in cell_value:
+                        elif "brut:" in cell_value and "net:" in cell_value:
                             # Format spécial pour IS: "brut: X XXX,XX € | net: X XXX,XX €"
                             # Extraire seulement la valeur nette
-                            net_part = cell_value.split("|")[1].strip()
-                            net_value = net_part.replace("net:", "").strip()
-                            numeric_value = float(net_value.replace(" ", "").replace("€", "").replace(",", "."))
+                            parts = cell_value.split("|")
+                            if len(parts) >= 2:
+                                net_part = parts[1].strip()
+                                net_value = net_part.replace("net:", "").strip()
+                                numeric_value = float(net_value.replace(" ", "").replace("€", "").replace(",", "."))
+                            else:
+                                # Si le format n'est pas exactement comme attendu
+                                # Essayons de récupérer le montant net d'une autre façon
+                                net_parts = cell_value.split("net:")
+                                if len(net_parts) >= 2:
+                                    net_value = net_parts[1].strip()
+                                    numeric_value = float(net_value.replace(" ", "").replace("€", "").replace(",", "."))
+                                else:
+                                    st.warning(f"Format de cellule avec IS non reconnu: {cell_value}")
+                                    numeric_value = 0
                         else:
                             # Autre texte, essayer de convertir directement
                             numeric_value = float(cell_value.replace(",", "."))
@@ -469,12 +481,24 @@ with pd.ExcelWriter(buffer, engine='xlsxwriter') as writer:
                         if "€" in cell_value:
                             # Format standard avec euro
                             numeric_value = float(cell_value.replace(" ", "").replace("€", "").replace(",", "."))
-                        elif "brut:" in cell_value and "|" in cell_value and "net:" in cell_value:
+                        elif "brut:" in cell_value and "net:" in cell_value:
                             # Format spécial pour IS: "brut: X XXX,XX € | net: X XXX,XX €"
                             # Extraire seulement la valeur nette
-                            net_part = cell_value.split("|")[1].strip()
-                            net_value = net_part.replace("net:", "").strip()
-                            numeric_value = float(net_value.replace(" ", "").replace("€", "").replace(",", "."))
+                            parts = cell_value.split("|")
+                            if len(parts) >= 2:
+                                net_part = parts[1].strip()
+                                net_value = net_part.replace("net:", "").strip()
+                                numeric_value = float(net_value.replace(" ", "").replace("€", "").replace(",", "."))
+                            else:
+                                # Si le format n'est pas exactement comme attendu
+                                # Essayons de récupérer le montant net d'une autre façon
+                                net_parts = cell_value.split("net:")
+                                if len(net_parts) >= 2:
+                                    net_value = net_parts[1].strip()
+                                    numeric_value = float(net_value.replace(" ", "").replace("€", "").replace(",", "."))
+                                else:
+                                    st.warning(f"Format de cellule avec IS non reconnu: {cell_value}")
+                                    numeric_value = 0
                         else:
                             # Autre texte, essayer de convertir directement
                             numeric_value = float(cell_value.replace(",", "."))
