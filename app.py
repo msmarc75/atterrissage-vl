@@ -6,6 +6,12 @@ import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import io
 
+def safe_float_format(val):
+    try:
+        return f"{float(val):,.2f} €".replace(",", " ").replace(".", ",")
+    except:
+        return "N/A"
+
 from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4
 from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image
@@ -106,7 +112,7 @@ try:
         couleur_bleue = "#0000DC"
         ax.plot(dates_semestres, vl_semestres, marker='o', linewidth=2.5, color=couleur_bleue)
         for i, txt in enumerate(vl_semestres):
-            ax.annotate(f"{float(txt):,.2f} €".replace(",", " ").replace(".", ","),
+            ax.annotate(safe_float_format(txt),
                         (dates_semestres[i], vl_semestres[i]),
                         textcoords="offset points", xytext=(0, 10), ha='center', fontsize=9,
                         bbox=dict(boxstyle="round,pad=0.3", fc=couleur_bleue, ec=couleur_bleue, alpha=0.9), color='white')
