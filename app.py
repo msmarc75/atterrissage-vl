@@ -63,8 +63,7 @@ with st.sidebar.form("param_form"):
 
 # Exécution seulement si le formulaire est validé
 if submitted:
-    
-# === DATES SEMESTRES ===
+    # === DATES SEMESTRES ===
 date_vl_connue = datetime.strptime(date_vl_connue_str, "%d/%m/%Y")
 date_fin_fonds = datetime.strptime(date_fin_fonds_str, "%d/%m/%Y")
 dates_semestres = [date_vl_connue]
