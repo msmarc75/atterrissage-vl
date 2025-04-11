@@ -63,6 +63,7 @@ if submitted:
     anr_derniere_vl = float(anr_derniere_vl_str.replace(" ", "").replace(",", ".").replace("€", "") or 0)
     nombre_parts = float(nombre_parts_str.replace(" ", "").replace(",", ".") or 0)
 
+    
 # Exécution seulement si le formulaire est validé
 if submitted:
     # === DATES SEMESTRES ===
