@@ -450,37 +450,100 @@ params = st.session_state.params
 st.sidebar.header("Gestion des simulations en BDD")
 
 # Option pour sauvegarder la simulation actuelle
-with st.sidebar.expander("💾 Sauvegarder la simulation actuelle"):
-    if st.button("Sauvegarder dans la BDD"):
-        # Préparer les données à sauvegarder
-        # Récupérer le nom du scénario depuis les variables locales ou les paramètres
-        scenario_nom = params.get('nom_scenario', 'Base case')
-        if 'nom_scenario' in locals():
-            scenario_nom = nom_scenario
-
-        export_data = {
-            "nom_fonds": nom_fonds if 'nom_fonds' in locals() else params['nom_fonds'],
-            "nom_scenario": scenario_nom,
-            "date_vl_connue": date_vl_connue_str if 'date_vl_connue_str' in locals() else params['date_vl_connue'],
-            "date_fin_fonds": date_fin_fonds_str if 'date_fin_fonds_str' in locals() else params['date_fin_fonds'],
-            "anr_derniere_vl": anr_derniere_vl if 'anr_derniere_vl' in locals() else params['anr_derniere_vl'],
-            "nombre_parts": nombre_parts if 'nombre_parts' in locals() else params['nombre_parts'],
-            "impacts": impacts if 'impacts' in locals() else params['impacts'],
-            "impacts_multidates": impacts_multidates if 'impacts_multidates' in locals() else params['impacts_multidates'],
-            "actifs": actifs if 'actifs' in locals() else params['actifs']
-        }
+with st.sidebar.expander("💾 Sauvegarder la simulation"):
+    # Récupérer les valeurs actuelles
+    current_nom_fonds = nom_fonds
+    current_nom_scenario = nom_scenario
+    
+    # Option pour créer une nouvelle sauvegarde ou mettre à jour
+    mode_sauvegarde = st.radio(
+        "Mode de sauvegarde",
+        ["Nouvelle sauvegarde", "Mettre à jour une sauvegarde existante"]
+    )
+    
+    if mode_sauvegarde == "Nouvelle sauvegarde":
+        if st.button("Sauvegarder comme nouvelle simulation"):
+            # Préparer les données à sauvegarder
+            export_data = {
+                "nom_fonds": current_nom_fonds,
+                "nom_scenario": current_nom_scenario,
+                "date_vl_connue": date_vl_connue_str,
+                "date_fin_fonds": date_fin_fonds_str,
+                "anr_derniere_vl": anr_derniere_vl,
+                "nombre_parts": nombre_parts,
+                "impacts": impacts,
+                "impacts_multidates": impacts_multidates,
+                "actifs": actifs
+            }
+            
+            # Date au format jour/mois/année
+            date_formatee = datetime.now().strftime("%d/%m/%Y")
+            
+            # Sauvegarder dans la BDD avec le commentaire formaté
+            commentaire = f"{current_nom_scenario} - {date_formatee}"
+            simulation_id = sauvegarder_simulation(export_data, commentaire)
+            
+            if simulation_id:
+                st.sidebar.success(f"Nouvelle simulation '{current_nom_scenario}' sauvegardée avec succès")
+            else:
+                st.sidebar.error("Échec de la sauvegarde, veuillez réessayer")
+    else:
+        # Option pour mettre à jour une sauvegarde existante
+        simulations = lister_simulations()
         
-        # Date au format jour/mois/année
-        date_formatee = datetime.now().strftime("%d/%m/%Y")
-        
-        # Sauvegarder dans la BDD avec le commentaire formaté
-        commentaire = f"{scenario_nom} - {date_formatee}"
-        simulation_id = sauvegarder_simulation(export_data, commentaire)
-        
-        if simulation_id:
-            st.sidebar.success(f"Simulation '{scenario_nom}' sauvegardée avec succès")
+        if simulations:
+            # Format d'affichage pour les simulations existantes
+            options = {}
+            for s in simulations:
+                date_creation = datetime.strptime(s['date_creation'], "%Y-%m-%d %H:%M:%S").strftime("%d/%m/%Y")
+                
+                if 'nom_scenario' in s and s['nom_scenario']:
+                    scenario = s['nom_scenario']
+                else:
+                    commentaire = s['commentaire'] if s['commentaire'] else "Sans nom"
+                    if ' - ' in commentaire:
+                        scenario = commentaire.split(' - ')[0]
+                    else:
+                        scenario = commentaire
+                
+                display_text = f"[{scenario}] - {s['nom_fonds']} ({date_creation})"
+                options[display_text] = s['id']
+                
+            sim_a_mettre_a_jour = st.selectbox(
+                "Choisir la simulation à mettre à jour",
+                options=list(options.keys())
+            )
+            
+            if st.button("Mettre à jour la simulation"):
+                simulation_id = options[sim_a_mettre_a_jour]
+                
+                # Préparer les données à sauvegarder
+                export_data = {
+                    "nom_fonds": current_nom_fonds,
+                    "nom_scenario": current_nom_scenario,
+                    "date_vl_connue": date_vl_connue_str,
+                    "date_fin_fonds": date_fin_fonds_str,
+                    "anr_derniere_vl": anr_derniere_vl,
+                    "nombre_parts": nombre_parts,
+                    "impacts": impacts,
+                    "impacts_multidates": impacts_multidates,
+                    "actifs": actifs
+                }
+                
+                # Supprimer l'ancienne simulation
+                supprimer_simulation(simulation_id)
+                
+                # Créer une nouvelle avec les mêmes données
+                date_formatee = datetime.now().strftime("%d/%m/%Y")
+                commentaire = f"{current_nom_scenario} - {date_formatee} (Mise à jour)"
+                new_id = sauvegarder_simulation(export_data, commentaire)
+                
+                if new_id:
+                    st.sidebar.success(f"Simulation '{current_nom_scenario}' mise à jour avec succès")
+                else:
+                    st.sidebar.error("Échec de la mise à jour, veuillez réessayer")
         else:
-            st.sidebar.error("Échec de la sauvegarde, veuillez réessayer")
+            st.info("Aucune simulation existante à mettre à jour")
 
 # Option pour charger une simulation existante
 with st.sidebar.expander("📂 Charger une simulation"):
@@ -1124,7 +1187,6 @@ if st.sidebar.button("📤 Exporter les paramètres JSON"):
     nom_fichier_json = f"{date_aujourd_hui} - {nom_fonds} - {nom_scenario}.json"
     json_export = json.dumps(export_data, indent=2).encode('utf-8')
     st.sidebar.download_button("Télécharger paramètres JSON", json_export, file_name=nom_fichier_json)
-
 
 # === BOUTON RÉINITIALISATION ===
 if st.sidebar.button("♻️ Réinitialiser les paramètres"):
