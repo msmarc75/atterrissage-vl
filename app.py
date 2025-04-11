@@ -101,6 +101,11 @@ try:
         projection_rows.append(row)
 
     projection = pd.DataFrame(projection_rows)
+    
+# Convertir toutes les colonnes sauf 'Date' en float (si possible)
+for col in projection.columns:
+    if col != "Date":
+        projection[col] = pd.to_numeric(projection[col], errors="coerce")
 
     with onglets[1]:
         st.header("Projection de la VL")
