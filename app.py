@@ -186,4 +186,4 @@ with col1:
         mime="application/vnd.ms-excel"
     )
 with col2:
-    st.write("\ud83d\udcca Export PDF désactivé.")
+    st.write("Export PDF désactivé.")
