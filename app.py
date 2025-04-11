@@ -54,27 +54,19 @@ with st.sidebar.form("param_form"):
     date_vl_connue_str = st.text_input("Date dernière VL connue (jj/mm/aaaa)", params['date_vl_connue'])
     date_fin_fonds_str = st.text_input("Date fin de fonds (jj/mm/aaaa)", params['date_fin_fonds'])
 
-    anr_derniere_vl = float(str(st.text_input("ANR dernière VL connue (€)", f"{params['anr_derniere_vl']:,.2f}"))
-        .replace(" ", "").replace(",", ".").replace("€", "") or 0)
-    nombre_parts = float(str(st.text_input("Nombre de parts", f"{params['nombre_parts']:,.2f}"))
-        .replace(" ", "").replace(",", ".") or 0)
+    anr_derniere_vl_str = st.text_input("ANR dernière VL connue (€)", f"{params['anr_derniere_vl']:,.2f}")
+    nombre_parts_str = st.text_input("Nombre de parts", f"{params['nombre_parts']:,.2f}")
 
     submitted = st.form_submit_button("🧮 Calculer la projection")
+
+if submitted:
+    anr_derniere_vl = float(anr_derniere_vl_str.replace(" ", "").replace(",", ".").replace("€", "") or 0)
+    nombre_parts = float(nombre_parts_str.replace(" ", "").replace(",", ".") or 0)
 
 # Exécution seulement si le formulaire est validé
 if submitted:
     # === DATES SEMESTRES ===
     date_vl_connue = datetime.strptime(date_vl_connue_str, "%d/%m/%Y")
-    date_fin_fonds = datetime.strptime(date_fin_fonds_str, "%d/%m/%Y")
-    dates_semestres = [date_vl_connue]
-    y = date_vl_connue.year
-    while datetime(y, 12, 31) <= date_fin_fonds:
-        if datetime(y, 6, 30) > date_vl_connue:
-            dates_semestres.append(datetime(y, 6, 30))
-        if datetime(y, 12, 31) > date_vl_connue:
-            dates_semestres.append(datetime(y, 12, 31))
-        y += 1
-date_vl_connue = datetime.strptime(date_vl_connue_str, "%d/%m/%Y")
 date_fin_fonds = datetime.strptime(date_fin_fonds_str, "%d/%m/%Y")
 dates_semestres = [date_vl_connue]
 y = date_vl_connue.year
@@ -88,13 +80,13 @@ while datetime(y, 12, 31) <= date_fin_fonds:
 # === SIDEBAR : IMPACTS RÉCURRENTS ===
 with st.sidebar.expander("🔁 Impacts récurrents (même chaque semestre)", expanded=expand_all):
     impacts_recurrents = []
-nb_impacts_rec = st.sidebar.number_input("Nombre d'impacts récurrents", min_value=0, value=len(params['impacts_recurrents']), step=1)
-for i in range(nb_impacts_rec):
-    libelle_defaut, montant_defaut = params['impacts_recurrents'][i] if i < len(params['impacts_recurrents']) else (f"Impact récurrent {i+1}", 0.0)
-    libelle = st.sidebar.text_input(f"Libellé impact récurrent {i+1}", libelle_defaut)
-    montant = float(str(st.sidebar.text_input(f"Montant impact récurrent {i+1} (€)", f"{montant_defaut:,.2f}"))
-                   .replace(" ", "").replace(",", ".").replace("€", "") or 0)
-    impacts_recurrents.append((libelle, montant))
+    nb_impacts_rec = st.number_input("Nombre d'impacts récurrents", min_value=0, value=len(params['impacts_recurrents']), step=1)
+    for i in range(nb_impacts_rec):
+        libelle_defaut, montant_defaut = params['impacts_recurrents'][i] if i < len(params['impacts_recurrents']) else (f"Impact récurrent {i+1}", 0.0)
+        libelle = st.text_input(f"Libellé impact récurrent {i+1}", libelle_defaut)
+        montant = float(str(st.text_input(f"Montant impact récurrent {i+1} (€)", f"{montant_defaut:,.2f}"))
+                        .replace(" ", "").replace(",", ".").replace("€", "") or 0)
+        impacts_recurrents.append((libelle, montant))
 
 st.sidebar.markdown("---")
 
