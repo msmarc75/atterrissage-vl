@@ -9,6 +9,10 @@ import os
 import sys
 import uuid
 import glob
+from pptx import Presentation
+from pptx.util import Inches, Pt
+from pptx.dml.color import RGBColor
+from pptx.enum.text import PP_ALIGN
 
 # Configuration de base de l'interface Streamlit
 st.set_page_config(page_title="Atterrissage VL", page_icon="📊", layout="wide")
@@ -442,6 +446,14 @@ with tab1:
             except ValueError:
                 st.warning(f"Valeur non numérique pour le nombre de parts, utilisation de {default_params['nombre_parts']}")
                 nombre_parts = default_params['nombre_parts']
+        
+        # Champ pour le commentaire de simulation
+        commentaire_simulation = st.text_area(
+            "Commentaire de simulation", 
+            value=params.get('commentaire_simulation', ''),
+            height=150,
+            help="Commentaire ou analyse pour cette simulation. Sera affiché dans l'export PowerPoint."
+        )
     
     with col_impacts:
         st.subheader("Impacts semestriels récurrents")
@@ -673,7 +685,8 @@ with tab1:
                 "nombre_parts": nombre_parts,
                 "impacts": impacts,
                 "impacts_multidates": impacts_multidates,
-                "actifs": actifs
+                "actifs": actifs,
+                "commentaire_simulation": commentaire_simulation
             }
             # Sauvegarder
             simulation_id = sauvegarder_simulation(current_params, commentaire)
@@ -691,7 +704,8 @@ with tab1:
                 "nombre_parts": nombre_parts,
                 "impacts": impacts,
                 "impacts_multidates": impacts_multidates,
-                "actifs": actifs
+                "actifs": actifs,
+                "commentaire_simulation": commentaire_simulation
             }
             st.rerun()
             
@@ -1089,7 +1103,7 @@ with tab1:
             buffer.seek(0)
             
             # Boutons d'exportation
-            export_col1, export_col2 = st.columns(2)
+            export_col1, export_col2, export_col3 = st.columns(3)
             
             with export_col1:
                 # Export Excel
@@ -1114,7 +1128,8 @@ with tab1:
                     "nombre_parts": nombre_parts,
                     "impacts": impacts,
                     "impacts_multidates": impacts_multidates,
-                    "actifs": actifs
+                    "actifs": actifs,
+                    "commentaire_simulation": commentaire_simulation
                 }
                 date_aujourd_hui = datetime.now().strftime("%Y%m%d")
                 nom_fichier_json = f"{date_aujourd_hui} - {nom_fonds} - {nom_scenario}.json"
@@ -1126,6 +1141,117 @@ with tab1:
                     file_name=nom_fichier_json,
                     mime="application/json"
                 )
+                
+            with export_col3:
+                # Export PowerPoint
+                # Créer un buffer pour stocker la présentation
+                if st.button("📊 Exporter en PowerPoint"):
+                    try:
+                        # Enregistrer temporairement le graphique
+                        temp_img_path = 'data/temp_chart.png'
+                        fig.savefig(temp_img_path, dpi=300, bbox_inches='tight')
+                        
+                        # Créer une nouvelle présentation PowerPoint
+                        prs = Presentation()
+                        
+                        # Définir la couleur bleue pour les éléments
+                        couleur_bleue_rgb = RGBColor.from_string(couleur_bleue.lstrip('#'))
+                        
+                        # Ajouter une diapositive
+                        slide_layout = prs.slide_layouts[6]  # Layout vide
+                        slide = prs.slides.add_slide(slide_layout)
+                        
+                        # Ajouter un titre
+                        title_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9), Inches(0.75))
+                        title_frame = title_box.text_frame
+                        title_para = title_frame.add_paragraph()
+                        title_para.text = f"Atterrissage VL - {nom_fonds} - {nom_scenario}"
+                        title_para.font.size = Pt(24)
+                        title_para.font.bold = True
+                        title_para.font.color.rgb = couleur_bleue_rgb
+                        
+                        # Ajouter l'image du graphique (à gauche)
+                        left = Inches(0.5)
+                        top = Inches(1.5)
+                        width = Inches(6)
+                        slide.shapes.add_picture(temp_img_path, left, top, width=width)
+                        
+                        # Ajouter un bloc de commentaire (à droite, fond bleu)
+                        comment_left = Inches(7)
+                        comment_top = Inches(1.5)
+                        comment_width = Inches(3)
+                        comment_height = Inches(4)
+                        
+                        # Rectangle bleu pour le commentaire
+                        comment_box = slide.shapes.add_shape(
+                            1,  # Rectangle
+                            comment_left, comment_top, comment_width, comment_height
+                        )
+                        comment_box.fill.solid()
+                        comment_box.fill.fore_color.rgb = couleur_bleue_rgb
+                        comment_box.line.color.rgb = couleur_bleue_rgb
+                        
+                        # Texte du commentaire
+                        text_box = slide.shapes.add_textbox(
+                            comment_left + Inches(0.2),
+                            comment_top + Inches(0.2),
+                            comment_width - Inches(0.4),
+                            comment_height - Inches(0.4)
+                        )
+                        text_frame = text_box.text_frame
+                        text_frame.word_wrap = True
+                        
+                        p = text_frame.add_paragraph()
+                        p.text = commentaire_simulation if commentaire_simulation else "Aucun commentaire pour cette simulation"
+                        p.font.size = Pt(12)
+                        p.font.color.rgb = RGBColor(255, 255, 255)  # Texte blanc
+                        p.alignment = PP_ALIGN.LEFT
+                        
+                        # Ajouter informations clés
+                        info_box = slide.shapes.add_textbox(
+                            Inches(0.5), Inches(6),
+                            Inches(6), Inches(1)
+                        )
+                        info_frame = info_box.text_frame
+                        
+                        info_p = info_frame.add_paragraph()
+                        info_p.text = f"VL dernière connue ({date_vl_connue_str}): {format_fr_euro(anr_derniere_vl/nombre_parts)}"
+                        info_p.font.bold = True
+                        
+                        info_p = info_frame.add_paragraph()
+                        vl_finale = vl_semestres[-1] if vl_semestres else 0
+                        info_p.text = f"VL prévisionnelle ({date_fin_fonds_str}): {format_fr_euro(vl_finale)}"
+                        info_p.font.bold = True
+                        
+                        info_p = info_frame.add_paragraph()
+                        variation_pct = ((vl_finale / (anr_derniere_vl/nombre_parts)) - 1) * 100 if vl_semestres and nombre_parts else 0
+                        info_p.text = f"Variation: {variation_pct:.2f}%"
+                        info_p.font.bold = True
+                        
+                        # Enregistrer dans un buffer
+                        pptx_buffer = io.BytesIO()
+                        prs.save(pptx_buffer)
+                        pptx_buffer.seek(0)
+                        
+                        # Générer un nom de fichier
+                        nom_fichier_pptx = f"{date_aujourd_hui} - Atterrissage VL - {nom_fonds}.pptx"
+                        
+                        # Offrir le téléchargement
+                        st.download_button(
+                            label="📥 Télécharger la présentation PowerPoint",
+                            data=pptx_buffer,
+                            file_name=nom_fichier_pptx,
+                            mime="application/vnd.openxmlformats-officedocument.presentationml.presentation"
+                        )
+                        
+                        # Supprimer le fichier temporaire
+                        if os.path.exists(temp_img_path):
+                            os.remove(temp_img_path)
+                            
+                    except Exception as e:
+                        st.error(f"Erreur lors de la génération de la présentation PowerPoint: {str(e)}")
+                        import traceback
+                        st.error(traceback.format_exc())
         except Exception as e:
             st.error(f"Erreur lors de la génération de l'export: {str(e)}")
         
@@ -1139,7 +1265,8 @@ with tab1:
             "nombre_parts": nombre_parts,
             "impacts": impacts,
             "impacts_multidates": impacts_multidates,
-            "actifs": actifs
+            "actifs": actifs,
+            "commentaire_simulation": commentaire_simulation
         }
     
     except Exception as e:
