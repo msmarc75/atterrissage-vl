@@ -12,6 +12,38 @@ import sys
 # Configuration de base de l'interface Streamlit
 st.set_page_config(page_title="Atterrissage VL", page_icon="📊", layout="wide")
 
+# Système d'authentification simple
+def check_password():
+    """Retourne `True` si le mot de passe est correct, `False` sinon."""
+    def password_entered():
+        """Vérifie si le mot de passe entré par l'utilisateur est correct."""
+        if st.session_state["password"] == "VLatterrissage2024":
+            st.session_state["password_correct"] = True
+            del st.session_state["password"]  # Ne pas stocker le mot de passe
+        else:
+            st.session_state["password_correct"] = False
+
+    if "password_correct" not in st.session_state:
+        # Premier affichage, afficher l'entrée du mot de passe
+        st.text_input(
+            "Mot de passe", type="password", on_change=password_entered, key="password"
+        )
+        return False
+    elif not st.session_state["password_correct"]:
+        # Mot de passe incorrect, nouvelle tentative
+        st.text_input(
+            "Mot de passe", type="password", on_change=password_entered, key="password"
+        )
+        st.error("😕 Mot de passe incorrect")
+        return False
+    else:
+        # Mot de passe correct
+        return True
+
+# Vérifie si l'utilisateur est authentifié
+if not check_password():
+    st.stop()  # Arrête l'exécution si le mot de passe est incorrect
+
 # Style CSS custom
 st.markdown("""
 <style>
