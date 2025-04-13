@@ -17,7 +17,7 @@ def check_password():
     """Retourne `True` si le mot de passe est correct, `False` sinon."""
     def password_entered():
         """Vérifie si le mot de passe entré par l'utilisateur est correct."""
-        if st.session_state["password"] == "VLatterrissage2024":
+        if st.session_state["password"] == "VL2025":
             st.session_state["password_correct"] = True
             del st.session_state["password"]  # Ne pas stocker le mot de passe
         else:
