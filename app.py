@@ -1109,172 +1109,98 @@ with tab1:
                         temp_img_path = 'data/temp_chart.png'
                         fig.savefig(temp_img_path, dpi=300, bbox_inches='tight')
                         
-                        # Essayer d'utiliser le template si disponible
-                        template_path = 'Atterrissage prévisionnel.pptx'
-                        try:
-                            if os.path.exists(template_path):
-                                prs = Presentation(template_path)
-                                # Utiliser la première diapositive du template
-                                slide = prs.slides[0]
-                                # Nettoyer les formes existantes si nécessaire
-                                shapes_to_delete = []
-                                for shape in slide.shapes:
-                                    # Conserver uniquement les éléments de design du template
-                                    if not hasattr(shape, 'shape_type') or shape.shape_type not in [1, 14]:  # 1=rectangle, 14=image
-                                        shapes_to_delete.append(shape)
-                                for shape in shapes_to_delete:
-                                    sp = shape._element
-                                    sp.getparent().remove(sp)
-                            else:
-                                # Créer une nouvelle présentation si le template n'existe pas
-                                prs = Presentation()
-                                slide_layout = prs.slide_layouts[6]  # Layout vide
-                                slide = prs.slides.add_slide(slide_layout)
-                        except Exception as e:
-                            # Fallback en cas d'erreur avec le template
-                            st.warning(f"Impossible d'utiliser le template: {str(e)}. Création d'une présentation standard.")
-                            prs = Presentation()
-                            slide_layout = prs.slide_layouts[6]  # Layout vide
-                            slide = prs.slides.add_slide(slide_layout)
+                        # Créer une présentation PowerPoint simple et propre
+                        prs = Presentation()
+                        # Utiliser un layout avec un titre et du contenu
+                        slide_layout = prs.slide_layouts[1]  # Layout avec titre et contenu
+                        slide = prs.slides.add_slide(slide_layout)
                         
                         # Définir la couleur bleue pour les éléments
                         couleur_bleue_rgb = RGBColor.from_string(couleur_bleue.lstrip('#'))
                         
-                        # Ajouter un titre
-                        title_box = slide.shapes.add_textbox(Inches(0.5), Inches(0.5), Inches(9), Inches(0.75))
-                        title_frame = title_box.text_frame
-                        title_para = title_frame.add_paragraph()
-                        title_para.text = f"Atterrissage VL - {nom_fonds} - {nom_scenario}"
-                        title_para.font.size = Pt(24)
-                        title_para.font.bold = True
-                        title_para.font.color.rgb = couleur_bleue_rgb
-                        title_para.alignment = PP_ALIGN.CENTER
+                        # Configurer le titre de la diapositive
+                        title = slide.shapes.title
+                        title.text = f"Atterrissage VL - {nom_fonds}"
+                        title.text_frame.paragraphs[0].font.color.rgb = couleur_bleue_rgb
+                        title.text_frame.paragraphs[0].font.bold = True
                         
-                        # Ajouter l'image du graphique (à gauche)
-                        left = Inches(0.5)
-                        top = Inches(1.5)
-                        width = Inches(6)
-                        slide.shapes.add_picture(temp_img_path, left, top, width=width)
+                        # Zone de contenu principale
+                        content = slide.placeholders[1]
                         
-                        # Ajouter un bloc de commentaire (à droite, fond bleu)
-                        comment_left = Inches(7)
-                        comment_top = Inches(1.5)
-                        comment_width = Inches(3)
-                        comment_height = Inches(4)
+                        # Ajouter l'image du graphique
+                        pic_left = Inches(1)
+                        pic_top = Inches(1.5)
+                        pic_width = Inches(8)
+                        slide.shapes.add_picture(temp_img_path, pic_left, pic_top, width=pic_width)
                         
-                        # Rectangle bleu pour le commentaire avec coins arrondis
-                        comment_box = slide.shapes.add_shape(
-                            5,  # Rectangle arrondi
-                            comment_left, comment_top, comment_width, comment_height
-                        )
-                        comment_box.fill.solid()
-                        comment_box.fill.fore_color.rgb = couleur_bleue_rgb
-                        comment_box.line.color.rgb = couleur_bleue_rgb
+                        # Ajouter un rectangle pour les informations clés
+                        info_left = Inches(1)
+                        info_top = Inches(5.5)
+                        info_width = Inches(8)
+                        info_height = Inches(1)
                         
-                        # Texte du commentaire
-                        text_box = slide.shapes.add_textbox(
-                            comment_left + Inches(0.3),
-                            comment_top + Inches(0.3),
-                            comment_width - Inches(0.6),
-                            comment_height - Inches(0.6)
-                        )
-                        text_frame = text_box.text_frame
-                        text_frame.word_wrap = True
-                        
-                        # Ajouter un titre au bloc de commentaire
-                        p_title = text_frame.add_paragraph()
-                        p_title.text = "COMMENTAIRES"
-                        p_title.font.size = Pt(14)
-                        p_title.font.bold = True
-                        p_title.font.color.rgb = RGBColor(255, 255, 255)  # Texte blanc
-                        p_title.alignment = PP_ALIGN.CENTER
-                        
-                        # Ajouter une ligne vide
-                        p_spacer = text_frame.add_paragraph()
-                        p_spacer.text = ""
-                        
-                        # Ajouter le contenu du commentaire
-                        p = text_frame.add_paragraph()
-                        p.text = commentaire_simulation if commentaire_simulation else "Aucun commentaire pour cette simulation"
-                        p.font.size = Pt(12)
-                        p.font.color.rgb = RGBColor(255, 255, 255)  # Texte blanc
-                        p.alignment = PP_ALIGN.LEFT
-                        
-                        # Ajouter un cadre d'information en bas (fond bleu clair)
-                        info_box_top = Inches(6)
                         info_box = slide.shapes.add_shape(
-                            5,  # Rectangle arrondi
-                            Inches(0.5), info_box_top,
-                            Inches(6), Inches(1)
+                            1,  # Rectangle
+                            info_left, info_top, info_width, info_height
                         )
                         info_box.fill.solid()
-                        # Bleu plus clair pour le bloc d'information
-                        info_box.fill.fore_color.rgb = RGBColor(220, 230, 255)
+                        info_box.fill.fore_color.rgb = RGBColor(240, 240, 240)  # Gris très clair
                         info_box.line.color.rgb = couleur_bleue_rgb
                         
-                        # Ajouter un titre au bloc d'information
-                        info_title_box = slide.shapes.add_textbox(
-                            Inches(0.5), info_box_top - Inches(0.3),
-                            Inches(6), Inches(0.3)
+                        # Ajouter le texte des informations clés
+                        info_text = slide.shapes.add_textbox(
+                            info_left + Inches(0.2), 
+                            info_top + Inches(0.1),
+                            info_width - Inches(0.4),
+                            info_height - Inches(0.2)
                         )
-                        info_title_frame = info_title_box.text_frame
-                        info_title_p = info_title_frame.add_paragraph()
-                        info_title_p.text = "INFORMATIONS CLÉS"
-                        info_title_p.font.size = Pt(14)
-                        info_title_p.font.bold = True
-                        info_title_p.font.color.rgb = couleur_bleue_rgb
                         
-                        # Texte d'information
-                        info_text_box = slide.shapes.add_textbox(
-                            Inches(0.7), info_box_top + Inches(0.2),
-                            Inches(5.6), Inches(0.8)
-                        )
-                        info_frame = info_text_box.text_frame
+                        info_frame = info_text.text_frame
+                        info_frame.word_wrap = True
                         
-                        # VL dernière connue
-                        info_p = info_frame.add_paragraph()
-                        info_p.text = f"VL dernière connue ({date_vl_connue_str}): {format_fr_euro(anr_derniere_vl/nombre_parts)}"
-                        info_p.font.bold = True
-                        info_p.font.color.rgb = couleur_bleue_rgb
+                        # Créer un paragraphe pour chaque information clé
+                        p1 = info_frame.add_paragraph()
+                        vl_initiale = anr_derniere_vl/nombre_parts if nombre_parts else 0
+                        p1.text = f"VL {date_vl_connue_str}: {format_fr_euro(vl_initiale)}"
+                        p1.font.bold = True
+                        p1.font.color.rgb = couleur_bleue_rgb
                         
-                        # VL prévisionnelle
-                        info_p = info_frame.add_paragraph()
+                        p2 = info_frame.add_paragraph()
                         vl_finale = vl_semestres[-1] if vl_semestres else 0
-                        info_p.text = f"VL prévisionnelle ({date_fin_fonds_str}): {format_fr_euro(vl_finale)}"
-                        info_p.font.bold = True
-                        info_p.font.color.rgb = couleur_bleue_rgb
+                        p2.text = f"VL {date_fin_fonds_str}: {format_fr_euro(vl_finale)}"
+                        p2.font.bold = True
+                        p2.font.color.rgb = couleur_bleue_rgb
                         
-                        # Variation
-                        info_p = info_frame.add_paragraph()
-                        variation_pct = ((vl_finale / (anr_derniere_vl/nombre_parts)) - 1) * 100 if vl_semestres and nombre_parts else 0
-                        variation_text = f"Variation: {variation_pct:.2f}%"
+                        # Calcul de la variation
+                        variation_pct = ((vl_finale / vl_initiale) - 1) * 100 if vl_initiale != 0 else 0
                         
-                        # Ajouter une flèche selon la variation
+                        p3 = info_frame.add_paragraph()
+                        
+                        # Formater le texte selon que la variation est positive ou négative
                         if variation_pct > 0:
-                            variation_text = f"Variation: ▲ {variation_pct:.2f}%"
-                            info_p.font.color.rgb = RGBColor(0, 128, 0)  # Vert pour valeur positive
+                            p3.text = f"Variation: +{variation_pct:.2f}%"
+                            p3.font.color.rgb = RGBColor(0, 128, 0)  # Vert
                         elif variation_pct < 0:
-                            variation_text = f"Variation: ▼ {variation_pct:.2f}%"
-                            info_p.font.color.rgb = RGBColor(192, 0, 0)  # Rouge pour valeur négative
+                            p3.text = f"Variation: {variation_pct:.2f}%"
+                            p3.font.color.rgb = RGBColor(192, 0, 0)  # Rouge
                         else:
-                            info_p.font.color.rgb = couleur_bleue_rgb
-                            
-                        info_p.text = variation_text
-                        info_p.font.bold = True
+                            p3.text = f"Variation: 0.00%"
+                            p3.font.color.rgb = couleur_bleue_rgb
                         
-                        # Ajouter date de génération et logo Novaxia
-                        footer_box = slide.shapes.add_textbox(
-                            Inches(0.5), Inches(7.2),
+                        p3.font.bold = True
+                        
+                        # Ajouter un pied de page avec la date
+                        footer = slide.shapes.add_textbox(
+                            Inches(0.5), Inches(6.8),
                             Inches(9), Inches(0.3)
                         )
-                        footer_frame = footer_box.text_frame
+                        
+                        footer_frame = footer.text_frame
                         footer_p = footer_frame.add_paragraph()
-                        date_generation = datetime.now().strftime("%d/%m/%Y")
-                        footer_p.text = f"Document généré le {date_generation}"
-                        footer_p.font.size = Pt(9)
+                        footer_p.text = f"Document généré le {datetime.now().strftime('%d/%m/%Y')} - {nom_scenario}"
                         footer_p.font.italic = True
+                        footer_p.font.size = Pt(9)
                         footer_p.alignment = PP_ALIGN.RIGHT
-                        footer_p.font.color.rgb = RGBColor(128, 128, 128)  # Gris
                         
                         # Enregistrer dans un buffer
                         pptx_buffer = io.BytesIO()
