@@ -158,8 +158,8 @@ def init_db():
 default_params = {
     "nom_fonds": "Nom du Fonds",
     "nom_scenario": "Base case",
-    "date_vl_connue": "31/12/2023",
-    "date_fin_fonds": "31/12/2026",
+    "date_vl_connue": "31/12/2024",
+    "date_fin_fonds": "31/12/2027",
     "anr_derniere_vl": 10_000_000.0,
     "nombre_parts": 10_000.0,
     "impacts": [
@@ -169,8 +169,8 @@ default_params = {
         {
             "libelle": "Honoraires NIV",
             "montants": [
-                {"date": "30/06/2024", "montant": -30_000.0},
-                {"date": "31/12/2024", "montant": -15_000.0}
+                {"date": "30/06/2025", "montant": -30_000.0},
+                {"date": "31/12/2025", "montant": -15_000.0}
             ]
         }
     ],
