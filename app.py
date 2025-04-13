@@ -12,13 +12,23 @@ import sys
 # Configuration de base de l'interface Streamlit
 st.set_page_config(page_title="Atterrissage VL", page_icon="📊", layout="wide")
 
-# Système d'authentification simple
+# Système d'authentification simple avec persistance de 30 jours
 def check_password():
-    """Retourne `True` si le mot de passe est correct, `False` sinon."""
+    """Retourne `True` si le mot de passe est correct ou déjà validé, `False` sinon."""
+    # Vérifier si l'authentification a déjà été validée dans un cookie
+    if "password_validated" in st.session_state:
+        expiry_date = st.session_state["password_validated"]
+        current_date = datetime.now()
+        # Si le cookie est toujours valide (moins de 30 jours)
+        if (current_date - expiry_date).days < 30:
+            return True
+
     def password_entered():
         """Vérifie si le mot de passe entré par l'utilisateur est correct."""
         if st.session_state["password"] == "VL2025":
             st.session_state["password_correct"] = True
+            # Enregistrer la date de validation pour 30 jours
+            st.session_state["password_validated"] = datetime.now()
             del st.session_state["password"]  # Ne pas stocker le mot de passe
         else:
             st.session_state["password_correct"] = False
