@@ -1,13 +1,14 @@
 import streamlit as st
 import pandas as pd
 import json
-import sqlite3
 from datetime import datetime
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import io
 import os
 import sys
+import uuid
+import glob
 
 # Configuration de base de l'interface Streamlit
 st.set_page_config(page_title="Atterrissage VL", page_icon="📊", layout="wide")
@@ -113,86 +114,16 @@ def champ_numerique(label, valeur, conteneur=st.sidebar):
         st.warning(f"Erreur avec le champ {label}: {str(e)}")
         return 0.0
 
-# === INITIALISATION DE LA BASE DE DONNÉES ===
-def init_db():
-    """Créer la base de données si elle n'existe pas"""
+# === INITIALISATION DU STOCKAGE JSON ===
+def init_storage():
+    """Créer le répertoire de stockage des fichiers JSON si nécessaire"""
     try:
         # Créer le répertoire data s'il n'existe pas
-        os.makedirs('data', exist_ok=True)
-        
-        conn = sqlite3.connect('data/simulations_fonds.db')
-        c = conn.cursor()
-        
-        # Table principale pour les paramètres généraux
-        c.execute('''
-        CREATE TABLE IF NOT EXISTS simulations (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            nom_fonds TEXT NOT NULL,
-            date_vl_connue TEXT NOT NULL,
-            date_fin_fonds TEXT NOT NULL,
-            anr_derniere_vl REAL NOT NULL,
-            nombre_parts REAL NOT NULL,
-            date_creation TIMESTAMP NOT NULL,
-            commentaire TEXT,
-            nom_scenario TEXT DEFAULT 'Base case'
-        )
-        ''')
-        
-        # Table pour les impacts récurrents
-        c.execute('''
-        CREATE TABLE IF NOT EXISTS impacts_recurrents (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            simulation_id INTEGER NOT NULL,
-            libelle TEXT NOT NULL,
-            montant REAL NOT NULL,
-            FOREIGN KEY (simulation_id) REFERENCES simulations (id) ON DELETE CASCADE
-        )
-        ''')
-        
-        # Table pour les impacts multidates
-        c.execute('''
-        CREATE TABLE IF NOT EXISTS impacts_multidates (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            simulation_id INTEGER NOT NULL,
-            libelle TEXT NOT NULL,
-            FOREIGN KEY (simulation_id) REFERENCES simulations (id) ON DELETE CASCADE
-        )
-        ''')
-        
-        # Table pour les occurrences des impacts multidates
-        c.execute('''
-        CREATE TABLE IF NOT EXISTS occurrences_impacts (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            impact_multidate_id INTEGER NOT NULL,
-            date TEXT NOT NULL,
-            montant REAL NOT NULL,
-            FOREIGN KEY (impact_multidate_id) REFERENCES impacts_multidates (id) ON DELETE CASCADE
-        )
-        ''')
-        
-        # Table pour les actifs
-        c.execute('''
-        CREATE TABLE IF NOT EXISTS actifs (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            simulation_id INTEGER NOT NULL,
-            nom TEXT NOT NULL,
-            pct_detention REAL NOT NULL,
-            valeur_actuelle REAL NOT NULL,
-            valeur_projetee REAL NOT NULL,
-            is_a_provisionner BOOLEAN DEFAULT 0,
-            FOREIGN KEY (simulation_id) REFERENCES simulations (id) ON DELETE CASCADE
-        )
-        ''')
-        
-        # Activer le support des clés étrangères
-        c.execute("PRAGMA foreign_keys = ON")
-        
-        conn.commit()
-        conn.close()
+        os.makedirs('data/simulations', exist_ok=True)
         
     except Exception as e:
         # En cas d'erreur, informer clairement l'utilisateur
-        st.error(f"Erreur lors de l'initialisation de la base de données: {str(e)}")
+        st.error(f"Erreur lors de l'initialisation du stockage: {str(e)}")
         import traceback
         st.error(traceback.format_exc())
 
@@ -229,13 +160,10 @@ default_params = {
     ]
 }
 
-# Fonctions pour la gestion des simulations en base de données
+# Fonctions pour la gestion des simulations en JSON
 def sauvegarder_simulation(params, commentaire=""):
-    """Sauvegarder une simulation en base de données"""
+    """Sauvegarder une simulation dans un fichier JSON"""
     try:
-        conn = sqlite3.connect('data/simulations_fonds.db')
-        c = conn.cursor()
-        
         # S'assurer que les valeurs numériques sont bien des nombres
         try:
             anr = float(params['anr_derniere_vl'])
@@ -248,27 +176,28 @@ def sauvegarder_simulation(params, commentaire=""):
         
         # Récupérer le nom du scénario, utiliser "Base case" par défaut
         nom_scenario = params.get('nom_scenario', 'Base case')
+        nom_fonds = params.get('nom_fonds', 'Fonds sans nom')
         
-        # Insertion avec le nom du scénario
-        c.execute('''
-        INSERT INTO simulations (
-            nom_fonds, nom_scenario, date_vl_connue, date_fin_fonds, 
-            anr_derniere_vl, nombre_parts, date_creation, commentaire
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            params.get('nom_fonds', 'Fonds sans nom'),
-            nom_scenario, 
-            params.get('date_vl_connue', '31/12/2023'), 
-            params.get('date_fin_fonds', '31/12/2026'),
-            anr, 
-            parts, 
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-            commentaire
-        ))
+        # Créer un identifiant unique pour cette simulation
+        simulation_id = str(uuid.uuid4())
         
-        simulation_id = c.lastrowid
+        # Préparer le dictionnaire complet de la simulation
+        simulation_data = {
+            "id": simulation_id,
+            "nom_fonds": nom_fonds,
+            "nom_scenario": nom_scenario,
+            "date_vl_connue": params.get('date_vl_connue', '31/12/2023'),
+            "date_fin_fonds": params.get('date_fin_fonds', '31/12/2026'),
+            "anr_derniere_vl": anr,
+            "nombre_parts": parts,
+            "date_creation": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            "commentaire": commentaire,
+            "impacts": [],
+            "impacts_multidates": [],
+            "actifs": []
+        }
         
-        # Insérer les impacts récurrents
+        # Traiter les impacts récurrents
         impacts = params.get('impacts', [])
         for impact in impacts:
             try:
@@ -282,39 +211,39 @@ def sauvegarder_simulation(params, commentaire=""):
                     continue  # Ignorer les impacts mal formatés
                 
                 montant_float = float(montant)
-                c.execute('''
-                INSERT INTO impacts_recurrents (simulation_id, libelle, montant)
-                VALUES (?, ?, ?)
-                ''', (simulation_id, libelle, montant_float))
+                simulation_data['impacts'].append({
+                    "libelle": libelle,
+                    "montant": montant_float
+                })
             except (ValueError, TypeError) as e:
                 st.warning(f"Problème avec un impact récurrent: {str(e)}")
         
-        # Insérer les impacts multidates
+        # Traiter les impacts multidates
         impacts_multidates = params.get('impacts_multidates', [])
         for impact in impacts_multidates:
             try:
-                c.execute('''
-                INSERT INTO impacts_multidates (simulation_id, libelle)
-                VALUES (?, ?)
-                ''', (simulation_id, impact.get('libelle', 'Impact sans nom')))
+                impact_dict = {
+                    "libelle": impact.get('libelle', 'Impact sans nom'),
+                    "montants": []
+                }
                 
-                impact_id = c.lastrowid
-                
-                # Insérer les occurrences de cet impact
+                # Ajouter les occurrences de cet impact
                 for occurrence in impact.get('montants', []):
                     try:
                         montant_float = float(occurrence.get('montant', 0))
                         date = occurrence.get('date', '01/01/2024')
-                        c.execute('''
-                        INSERT INTO occurrences_impacts (impact_multidate_id, date, montant)
-                        VALUES (?, ?, ?)
-                        ''', (impact_id, date, montant_float))
+                        impact_dict["montants"].append({
+                            "date": date,
+                            "montant": montant_float
+                        })
                     except (ValueError, TypeError) as e:
                         st.warning(f"Problème avec une occurrence d'impact: {str(e)}")
+                
+                simulation_data['impacts_multidates'].append(impact_dict)
             except Exception as e:
                 st.warning(f"Problème avec un impact multidate: {str(e)}")
         
-        # Insérer les actifs
+        # Traiter les actifs
         actifs = params.get('actifs', [])
         for actif in actifs:
             try:
@@ -323,24 +252,31 @@ def sauvegarder_simulation(params, commentaire=""):
                 val_proj = float(actif.get('valeur_projetee', 1050000.0))
                 is_prov = bool(actif.get('is_a_provisionner', False))
                 
-                c.execute('''
-                INSERT INTO actifs (
-                    simulation_id, nom, pct_detention, 
-                    valeur_actuelle, valeur_projetee, is_a_provisionner
-                ) VALUES (?, ?, ?, ?, ?, ?)
-                ''', (
-                    simulation_id, 
-                    actif.get('nom', 'Actif sans nom'), 
-                    pct,
-                    val_act, 
-                    val_proj, 
-                    is_prov
-                ))
+                # Calculer les valeurs dérivées
+                variation_brute = (val_proj - val_act) * pct
+                
+                # Appliquer la règle de l'IS (75% de l'impact en cas de plus-value)
+                if is_prov and variation_brute > 0:
+                    variation = variation_brute * 0.75  # Réduction de 25% pour l'IS
+                else:
+                    variation = variation_brute
+                
+                simulation_data['actifs'].append({
+                    "nom": actif.get('nom', 'Actif sans nom'),
+                    "pct_detention": pct,
+                    "valeur_actuelle": val_act,
+                    "valeur_projetee": val_proj,
+                    "is_a_provisionner": is_prov,
+                    "variation": variation,
+                    "variation_brute": variation_brute
+                })
             except (ValueError, TypeError, KeyError) as e:
                 st.warning(f"Problème avec un actif: {str(e)}")
         
-        conn.commit()
-        conn.close()
+        # Sauvegarder les données dans un fichier JSON
+        filename = f"data/simulations/{simulation_id}.json"
+        with open(filename, 'w', encoding='utf-8') as f:
+            json.dump(simulation_data, f, ensure_ascii=False, indent=4)
         
         return simulation_id
         
@@ -351,93 +287,38 @@ def sauvegarder_simulation(params, commentaire=""):
         return None
 
 def charger_simulation(simulation_id):
-    """Charger une simulation depuis la base de données"""
+    """Charger une simulation depuis un fichier JSON"""
     try:
-        conn = sqlite3.connect('data/simulations_fonds.db')
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
+        # Charger les données depuis le fichier JSON
+        filename = f"data/simulations/{simulation_id}.json"
+        with open(filename, 'r', encoding='utf-8') as f:
+            simulation_data = json.load(f)
         
-        # Récupérer les paramètres généraux
-        c.execute("SELECT * FROM simulations WHERE id = ?", (simulation_id,))
-        sim_row = c.fetchone()
-        
-        # Vérifier que la simulation existe
-        if not sim_row:
-            st.error(f"Simulation avec ID {simulation_id} introuvable.")
-            conn.close()
-            return None
-        
-        # Convertir en dictionnaire
-        sim = dict(sim_row)
-        
-        # Structure pour stocker les paramètres complets
+        # Structure pour stocker les paramètres nécessaires à l'application
         params = {
-            'nom_fonds': sim['nom_fonds'],
-            'nom_scenario': sim.get('nom_scenario', 'Base case'),
-            'date_vl_connue': sim['date_vl_connue'],
-            'date_fin_fonds': sim['date_fin_fonds'],
-            'anr_derniere_vl': float(sim['anr_derniere_vl']),
-            'nombre_parts': float(sim['nombre_parts']),
+            'nom_fonds': simulation_data.get('nom_fonds', 'Fonds sans nom'),
+            'nom_scenario': simulation_data.get('nom_scenario', 'Base case'),
+            'date_vl_connue': simulation_data.get('date_vl_connue', '31/12/2023'),
+            'date_fin_fonds': simulation_data.get('date_fin_fonds', '31/12/2026'),
+            'anr_derniere_vl': float(simulation_data.get('anr_derniere_vl', 10000000.0)),
+            'nombre_parts': float(simulation_data.get('nombre_parts', 10000.0)),
             'impacts': [],
             'impacts_multidates': [],
             'actifs': []
         }
         
         # Récupérer les impacts récurrents
-        c.execute("SELECT libelle, montant FROM impacts_recurrents WHERE simulation_id = ?", (simulation_id,))
-        impacts_rows = c.fetchall()
-        params['impacts'] = [(row['libelle'], float(row['montant'])) for row in impacts_rows]
+        for impact in simulation_data.get('impacts', []):
+            libelle = impact.get('libelle', 'Sans nom')
+            montant = float(impact.get('montant', 0.0))
+            params['impacts'].append((libelle, montant))
         
         # Récupérer les impacts multidates
-        c.execute("SELECT id, libelle FROM impacts_multidates WHERE simulation_id = ?", (simulation_id,))
-        impacts_multidates = c.fetchall()
-        
-        for impact in impacts_multidates:
-            impact_dict = {'libelle': impact['libelle'], 'montants': []}
-            
-            # Récupérer les occurrences pour cet impact
-            c.execute("""
-            SELECT date, montant FROM occurrences_impacts 
-            WHERE impact_multidate_id = ?
-            """, (impact['id'],))
-            
-            impact_dict['montants'] = [
-                {'date': row['date'], 'montant': float(row['montant'])} 
-                for row in c.fetchall()
-            ]
-            
-            params['impacts_multidates'].append(impact_dict)
+        params['impacts_multidates'] = simulation_data.get('impacts_multidates', [])
         
         # Récupérer les actifs
-        c.execute("""
-        SELECT nom, pct_detention, valeur_actuelle, valeur_projetee, is_a_provisionner 
-        FROM actifs WHERE simulation_id = ?
-        """, (simulation_id,))
+        params['actifs'] = simulation_data.get('actifs', [])
         
-        for row in c.fetchall():
-            actif = {
-                'nom': row['nom'],
-                'pct_detention': float(row['pct_detention']),
-                'valeur_actuelle': float(row['valeur_actuelle']),
-                'valeur_projetee': float(row['valeur_projetee']),
-                'is_a_provisionner': bool(row['is_a_provisionner'])
-            }
-            
-            # Calculer les valeurs dérivées qui sont attendues par l'application
-            variation_brute = (actif['valeur_projetee'] - actif['valeur_actuelle']) * actif['pct_detention']
-            
-            # Appliquer la règle de l'IS (75% de l'impact en cas de plus-value)
-            if actif['is_a_provisionner'] and variation_brute > 0:
-                variation = variation_brute * 0.75  # Réduction de 25% pour l'IS
-            else:
-                variation = variation_brute  # Pas de modification en cas de moins-value ou si IS non provisionné
-            
-            actif['variation'] = variation
-            actif['variation_brute'] = variation_brute
-            
-            params['actifs'].append(actif)
-        
-        conn.close()
         return params
     except Exception as e:
         st.error(f"Erreur lors du chargement: {str(e)}")
@@ -446,64 +327,59 @@ def charger_simulation(simulation_id):
 def lister_simulations():
     """Lister toutes les simulations sauvegardées"""
     try:
-        conn = sqlite3.connect('data/simulations_fonds.db')
-        conn.row_factory = sqlite3.Row
-        c = conn.cursor()
-        
-        # Requête incluant le nom_scenario
-        c.execute("""
-        SELECT id, nom_fonds, nom_scenario, date_vl_connue, date_creation, commentaire 
-        FROM simulations ORDER BY date_creation DESC
-        """)
-        
         simulations = []
-        for row in c.fetchall():
-            # Convertir en dictionnaire
-            sim_dict = dict(row)
-            
-            # Nettoyer le nom du fonds (enlever les dates potentielles)
-            if sim_dict['nom_fonds'] and '(' in sim_dict['nom_fonds']:
-                # Si le nom contient une parenthèse (comme une date), prendre juste la partie avant
-                sim_dict['nom_fonds'] = sim_dict['nom_fonds'].split('(')[0].strip()
-            
-            # Assurer qu'il y a un nom_scenario
-            if 'nom_scenario' not in sim_dict or not sim_dict['nom_scenario']:
-                # Essayer d'extraire du commentaire
-                if sim_dict['commentaire'] and ' - ' in sim_dict['commentaire']:
-                    sim_dict['nom_scenario'] = sim_dict['commentaire'].split(' - ')[0].strip()
-                else:
-                    sim_dict['nom_scenario'] = 'Base case'
-            
-            simulations.append(sim_dict)
+        # Trouver tous les fichiers JSON dans le répertoire des simulations
+        json_files = glob.glob('data/simulations/*.json')
         
-        conn.close()
+        for file_path in json_files:
+            try:
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    simulation_data = json.load(f)
+                
+                # Créer un dictionnaire avec les informations importantes
+                sim_dict = {
+                    'id': simulation_data.get('id', os.path.basename(file_path).replace('.json', '')),
+                    'nom_fonds': simulation_data.get('nom_fonds', 'Fonds sans nom'),
+                    'nom_scenario': simulation_data.get('nom_scenario', 'Base case'),
+                    'date_vl_connue': simulation_data.get('date_vl_connue', '31/12/2023'),
+                    'date_creation': simulation_data.get('date_creation', ''),
+                    'commentaire': simulation_data.get('commentaire', '')
+                }
+                
+                # Nettoyer le nom du fonds (enlever les dates potentielles)
+                if sim_dict['nom_fonds'] and '(' in sim_dict['nom_fonds']:
+                    # Si le nom contient une parenthèse (comme une date), prendre juste la partie avant
+                    sim_dict['nom_fonds'] = sim_dict['nom_fonds'].split('(')[0].strip()
+                
+                simulations.append(sim_dict)
+            except Exception as e:
+                st.warning(f"Problème lors de la lecture du fichier {file_path}: {str(e)}")
+        
+        # Trier par date de création (du plus récent au plus ancien)
+        simulations.sort(key=lambda x: x.get('date_creation', ''), reverse=True)
+        
         return simulations
     except Exception as e:
         st.error(f"Erreur lors de la lecture des simulations: {str(e)}")
         return []
 
 def supprimer_simulation(simulation_id):
-    """Supprimer une simulation de la base de données"""
+    """Supprimer une simulation (fichier JSON)"""
     try:
-        conn = sqlite3.connect('data/simulations_fonds.db')
-        c = conn.cursor()
-        
-        # Activer les clés étrangères pour s'assurer que la cascade fonctionne
-        c.execute("PRAGMA foreign_keys = ON")
-        
-        # Supprimer la simulation (les autres tables seront nettoyées par la cascade)
-        c.execute("DELETE FROM simulations WHERE id = ?", (simulation_id,))
-        
-        conn.commit()
-        conn.close()
-        return True
+        filename = f"data/simulations/{simulation_id}.json"
+        if os.path.exists(filename):
+            os.remove(filename)
+            return True
+        else:
+            st.warning(f"Simulation avec ID {simulation_id} introuvable.")
+            return False
     except Exception as e:
         st.error(f"Erreur lors de la suppression: {str(e)}")
         return False
 
-# Initialiser la base de données au démarrage
+# Initialiser le stockage au démarrage
 try:
-    init_db()
+    init_storage()
 except Exception as e:
     st.error(f"Erreur critique lors de l'initialisation: {str(e)}")
 
