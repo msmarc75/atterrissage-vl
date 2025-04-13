@@ -516,8 +516,14 @@ with tab1:
             anr_derniere_vl = champ_numerique("ANR dernière VL connue (€)", 
                                               params.get('anr_derniere_vl', default_params['anr_derniere_vl']), st)
         with col4:
-            nombre_parts = champ_numerique("Nombre de parts", 
-                                          params.get('nombre_parts', default_params['nombre_parts']), st)
+            # Utilisation d'un champ spécifique pour le nombre de parts (sans format euro)
+            try:
+                nombre_parts_str = st.text_input("Nombre de parts", 
+                                              value=f"{params.get('nombre_parts', default_params['nombre_parts']):,.2f}".replace(",", " ").replace(".", ","))
+                nombre_parts = float(nombre_parts_str.replace(" ", "").replace(",", "."))
+            except ValueError:
+                st.warning(f"Valeur non numérique pour le nombre de parts, utilisation de {default_params['nombre_parts']}")
+                nombre_parts = default_params['nombre_parts']
     
     with col_impacts:
         st.subheader("Impacts semestriels récurrents")
