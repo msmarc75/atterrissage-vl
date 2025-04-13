@@ -17,48 +17,6 @@ from pptx.enum.text import PP_ALIGN
 # Configuration de base de l'interface Streamlit
 st.set_page_config(page_title="Atterrissage VL", page_icon="📊", layout="wide")
 
-# Système d'authentification simple avec persistance de 30 jours
-def check_password():
-    """Retourne `True` si le mot de passe est correct ou déjà validé, `False` sinon."""
-    # Vérifier si l'authentification a déjà été validée dans un cookie
-    if "password_validated" in st.session_state:
-        expiry_date = st.session_state["password_validated"]
-        current_date = datetime.now()
-        # Si le cookie est toujours valide (moins de 30 jours)
-        if (current_date - expiry_date).days < 30:
-            return True
-
-    def password_entered():
-        """Vérifie si le mot de passe entré par l'utilisateur est correct."""
-        if st.session_state["password"] == "VL2025":
-            st.session_state["password_correct"] = True
-            # Enregistrer la date de validation pour 30 jours
-            st.session_state["password_validated"] = datetime.now()
-            del st.session_state["password"]  # Ne pas stocker le mot de passe
-        else:
-            st.session_state["password_correct"] = False
-
-    if "password_correct" not in st.session_state:
-        # Premier affichage, afficher l'entrée du mot de passe
-        st.text_input(
-            "Mot de passe", type="password", on_change=password_entered, key="password"
-        )
-        return False
-    elif not st.session_state["password_correct"]:
-        # Mot de passe incorrect, nouvelle tentative
-        st.text_input(
-            "Mot de passe", type="password", on_change=password_entered, key="password"
-        )
-        st.error("😕 Mot de passe incorrect")
-        return False
-    else:
-        # Mot de passe correct
-        return True
-
-# Vérifie si l'utilisateur est authentifié
-if not check_password():
-    st.stop()  # Arrête l'exécution si le mot de passe est incorrect
-
 # Style CSS custom
 st.markdown("""
 <style>
