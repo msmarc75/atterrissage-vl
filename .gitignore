@@ -1,0 +1,33 @@
+# Fichiers de données SQLite
+data/simulations_fonds.db
+
+# Fichiers Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Environnements virtuels
+venv/
+env/
+ENV/
+
+# Fichiers Jupyter Notebook
+.ipynb_checkpoints
+
+# Fichiers système
+.DS_Store
+Thumbs.db
+
+# Fichiers d'environnement
+.env
+
+# Fichiers de logs
+*.log
+
+# Fichiers de caches
+.cache/
